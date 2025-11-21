@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>식쌍성 광도곡선 시뮬레이터</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>식쌍성 광도곡선 시뮬레이터</h1>
+    <p>케플러 궤도와 식 기하를 이용한 실시간 광도곡선 계산기</p>
+  </header>
+  <main>
+    <section class="controls">
+      <h2>파라미터</h2>
+      <div class="control-group">
+        <label for="r1">반지름 r1 (R☉): <span id="r1-val"></span></label>
+        <input type="range" id="r1" min="0.4" max="3" step="0.05" value="1.0" />
+      </div>
+      <div class="control-group">
+        <label for="r2">반지름 r2 (R☉): <span id="r2-val"></span></label>
+        <input type="range" id="r2" min="0.3" max="2.5" step="0.05" value="0.8" />
+      </div>
+      <div class="control-group">
+        <label for="t1">표면온도 T1 (K): <span id="t1-val"></span></label>
+        <input type="range" id="t1" min="3500" max="9000" step="100" value="6000" />
+      </div>
+      <div class="control-group">
+        <label for="t2">표면온도 T2 (K): <span id="t2-val"></span></label>
+        <input type="range" id="t2" min="3000" max="8000" step="100" value="5200" />
+      </div>
+      <div class="control-group">
+        <label for="m1">질량 M1 (M☉): <span id="m1-val"></span></label>
+        <input type="range" id="m1" min="0.5" max="5" step="0.05" value="1.0" />
+      </div>
+      <div class="control-group">
+        <label for="m2">질량 M2 (M☉): <span id="m2-val"></span></label>
+        <input type="range" id="m2" min="0.4" max="4" step="0.05" value="0.9" />
+      </div>
+      <div class="control-group">
+        <label for="ecc">이심률 e: <span id="ecc-val"></span></label>
+        <input type="range" id="ecc" min="0" max="0.8" step="0.01" value="0.1" />
+      </div>
+      <div class="control-group">
+        <label for="inc">경사각 i (deg): <span id="inc-val"></span></label>
+        <input type="range" id="inc" min="70" max="90" step="0.1" value="87" />
+      </div>
+      <div class="control-group">
+        <label for="period">궤도주기 P (일): <span id="period-val"></span></label>
+        <input type="range" id="period" min="0.4" max="10" step="0.05" value="3" />
+      </div>
+      <p class="note">* 단위: 태양 질량(M☉), 태양 반지름(R☉), 켈빈(K), 일(day)</p>
+    </section>
+    <section class="plot">
+      <h2>정규화 광도곡선</h2>
+      <div id="curve" aria-label="광도곡선 그래프"></div>
+    </section>
+  </main>
+  <footer>
+    <p>케플러 방정식 → true anomaly → 투영 분리 → 원 교차 면적 계산을 통해 eclipse flux를 계산합니다.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>
