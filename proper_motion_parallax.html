@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>고유운동 + 연주시차 시뮬레이터 (Standalone)</title>
+<style>
+  :root{--bg:#f8fafc;--panel:#fff;--line:#0f172a;--grid:#e5e7eb;--grid2:#eef2f7;--muted:#64748b;--accent:#2563eb}
+  body{margin:0;background:var(--bg);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"}
+  .wrap{max-width:1200px;margin:16px auto;padding:0 12px;position:relative}
+  h1{font-size:22px;margin:4px 0 10px}
+  .layout{display:grid;gap:16px;grid-template-columns:1fr}
+  @media(min-width:1200px){.layout{grid-template-columns:360px 1fr;align-items:start}}
+  .card{background:var(--panel);border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);padding:14px}
+  .section-title{font-weight:600;margin:0 0 10px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  label{font-size:12px;color:#0f172a;display:flex;flex-direction:column;gap:6px}
+  input[type=range]{width:100%}
+  .mini{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  input[type=number]{width:76px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:8px}
+  .check{display:flex;align-items:center;gap:8px}
+  .btns{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+  button{border:0;border-radius:12px;padding:8px 12px;cursor:pointer}
+  .b1{background:#e2e8f0}
+  .b2{background:#0f172a;color:#fff}
+  svg{width:100%;height:auto;border-radius:12px}
+  .box{background:#ffffff}
+  .muted{color:var(--muted)}
+  .badge{position:absolute;top:8px;right:16px;font-size:12px;color:#6b7280;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="badge">MADE BY 난영 (ver.1)</div>
+  <h1>고유운동 + 연주시차 시뮬레이터 (웹 단일 파일)</h1>
+  <p class="muted">X=RA 오프셋(동쪽+), Y=Dec 오프셋(북쪽+), 단위: mas. RA는 관례상 왼쪽이 동쪽(좌우 반전)입니다.</p>
+
+  <div class="layout">
+    <!-- LEFT: 컨트롤들 (세로 스택) -->
+    <div class="controls">
+      <!-- 연주시차 -->
+      <div class="card">
+        <div class="section-title">연주시차 (ellipse) 설정</div>
+        <div class="check" style="margin-bottom:8px">
+          <label class="check"><input type="radio" name="mode" value="beta" checked> β 모드</label>
+          <label class="check"><input type="radio" name="mode" value="manual"> 수동 모드</label>
+        </div>
+        <div class="row" id="betaRow">
+          <label>연주시차 p (mas)
+            <input id="parallax" type="range" min="0" max="500" step="1" value="100">
+            <div class="mini"><input id="parallaxN" type="number" min="0" max="500" step="1" value="100"> mas</div>
+          </label>
+          <label>황위 β (deg)
+            <input id="beta" type="range" min="0" max="90" step="1" value="30">
+            <div class="mini"><input id="betaN" type="number" min="0" max="90" step="1" value="30"> °</div>
+          </label>
+        </div>
+        <div class="row" id="manRow" style="display:none">
+          <label>Ellipse Ax (mas)
+            <input id="ax" type="range" min="0" max="500" step="1" value="100">
+            <div class="mini"><input id="axN" type="number" min="0" max="500" step="1" value="100"> mas</div>
+          </label>
+          <label>Ellipse Ay (mas)
+            <input id="ay" type="range" min="0" max="500" step="1" value="50">
+            <div class="mini"><input id="ayN" type="number" min="0" max="500" step="1" value="50"> mas</div>
+          </label>
+        </div>
+        <div class="row">
+          <label>Ellipse 방향 θ (deg)
+            <input id="theta" type="range" min="-180" max="180" step="1" value="30">
+            <div class="mini"><input id="thetaN" type="number" min="-180" max="180" step="1" value="30"> °</div>
+          </label>
+          <label>위상 φ (deg)
+            <input id="phase" type="range" min="0" max="360" step="1" value="0">
+            <div class="mini"><input id="phaseN" type="number" min="0" max="360" step="1" value="0"> °</div>
+          </label>
+        </div>
+      </div>
+
+      <!-- 고유운동 -->
+      <div class="card">
+        <div class="section-title">고유운동(선형)</div>
+        <div class="row">
+          <label>μ<sub>RA</sub> (mas/yr)
+            <input id="muX" type="range" min="-500" max="500" step="1" value="-150">
+            <div class="mini"><input id="muXN" type="number" min="-500" max="500" step="1" value="-150"> mas/yr</div>
+          </label>
+          <label>μ<sub>Dec</sub> (mas/yr)
+            <input id="muY" type="range" min="-500" max="500" step="1" value="80">
+            <div class="mini"><input id="muYN" type="number" min="-500" max="500" step="1" value="80"> mas/yr</div>
+          </label>
+        </div>
+      </div>
+
+      <!-- 시간 샘플링 -->
+      <div class="card">
+        <div class="section-title">시간 샘플링</div>
+        <div class="row3">
+          <label>기간 (yr)
+            <input id="years" type="range" min="1" max="10" step="1" value="3">
+            <div class="mini"><input id="yearsN" type="number" min="1" max="10" step="1" value="3"> yr</div>
+          </label>
+          <label>연당 점수
+            <input id="ppy" type="range" min="2" max="36" step="1" value="12">
+            <div class="mini"><input id="ppyN" type="number" min="2" max="36" step="1" value="12"> pts/yr</div>
+          </label>
+          <label>불규칙성 (jitter)
+            <input id="jitter" type="range" min="0" max="0.45" step="0.01" value="0">
+            <div class="mini"><input id="jitterN" type="number" min="0" max="0.45" step="0.01" value="0"></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- 표시 옵션 -->
+      <div class="card">
+        <div class="section-title">표시 옵션</div>
+        <div class="check"><input id="flipX" type="checkbox" checked> RA 축 좌우반전(동쪽←)</div>
+        <div class="check"><input id="showLines" type="checkbox" checked> 경로 연결선 표시</div>
+        <div class="check"><input id="showPM" type="checkbox" checked> 고유운동 직선(점선) 표시</div>
+        <div class="check"><input id="showRef" type="checkbox" checked> 연주시차 타원(점선) 표시</div>
+        <div class="btns">
+          <button class="b1" id="resetBtn">리셋</button>
+          <button class="b2" id="saveBtn">SVG 다운로드</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: 플롯 + (아래) 애니메이션/스케줄 -->
+    <div class="right">
+      <!-- 플롯 -->
+      <div class="card">
+        <svg id="plot" viewBox="0 0 780 520" class="box" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="780" height="520" fill="#ffffff"/>
+          <text x="390" y="18" text-anchor="middle" font-size="14" font-weight="600">Apparent Motion: Proper Motion + Annual Parallax</text>
+          <rect id="frame" x="80" y="24" width="676" height="436" fill="#fafafa" stroke="#e5e7eb"/>
+          <g id="grid"></g>
+          <g id="guides"></g>
+          <polyline id="path" fill="none" stroke="#111827" stroke-width="1.5"/>
+          <g id="points"></g>
+          <text id="xlabel" x="418" y="510" text-anchor="middle" font-size="12">Right Ascension offset (mas)</text>
+          <text id="ylabel" transform="translate(18 242) rotate(-90)" text-anchor="middle" font-size="12">Declination offset (mas)</text>
+        </svg>
+        <div class="muted" id="readout" style="margin-top:8px"></div>
+      </div>
+
+      <!-- (그림 아래) 애니메이션 / CSV -->
+      <div class="card">
+        <div class="section-title">애니메이션 / 스케줄</div>
+        <div class="btns">
+          <button class="b2" id="playBtn">재생</button>
+          <button class="b1" id="showAllBtn" title="애니메이션을 끄고 전체 궤적을 한 번에 표시합니다.">전체 경로 보기</button>
+          <span class="muted">t = <span id="tLabel">0</span> / <span id="tMax">3</span> yr</span>
+        </div>
+        <label>진행 (yr)
+          <input id="tSlider" type="range" min="0" max="3" step="0.01" value="0">
+        </label>
+        <label>속도 (배)
+          <input id="speed" type="range" min="0.25" max="4" step="0.25" value="1">
+          <div class="mini"><span id="speedLabel">1×</span></div>
+        </label>
+
+        <div class="check" style="margin-top:6px"><input id="useSched" type="checkbox"> CSV 스케줄 사용</div>
+        <input id="csvFile" type="file" accept=".csv,text/csv">
+        <div class="muted" style="margin-top:6px">
+          CSV 형식: <b>연 단위 시각</b>을 쉼표(,) 또는 줄바꿈으로 구분해 한 열로 작성<br>
+          예) <code>0, 0.25, 0.5, 0.75, 1.0, 1.25</code>  또는  줄바꿈으로 <code>0↵0.25↵0.5...</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Helpers ----
+const PI = Math.PI;
+const deg2rad = d => d * PI / 180;
+const rad2deg = r => r * 180 / PI;
+function rotate(x,y,th){ const t=deg2rad(th), c=Math.cos(t), s=Math.sin(t); return [x*c - y*s, x*s + y*c]; }
+function niceStep(range){ const rough = range/5; const p10 = 10 ** Math.floor(Math.log10(rough)); const n = rough/p10; return (n<1.5?1:n<3?2:n<7?5:10)*p10; }
+function fmt(x){ return Number(x).toLocaleString(undefined,{maximumFractionDigits:2}); }
+
+// ---- State ----
+const S = {
+  mode: 'beta', parallax:100, beta:30, ax:100, ay:50, theta:30, phase:0,
+  muX:-150, muY:80, years:3, ppy:12, jitter:0,
+  flipX:true, showLines:true, showPM:true, showRef:true,
+  // Animation & schedule
+  playing:false, t:0, speed:1,
+  useSchedule:false, sched:[],
+  // show-all helper
+  forceFull:false
+};
+
+// ---- Elements ----
+const el = id => document.getElementById(id);
+const plot = el('plot');
+const gridG = el('grid');
+const guidesG = el('guides');
+const pathEl = el('path');
+const pointsG = el('points');
+const readout = el('readout');
+
+// Mode toggle
+for(const r of document.querySelectorAll('input[name=mode]')){
+  r.addEventListener('change', () => {
+    S.mode = r.value;
+    document.getElementById('betaRow').style.display = S.mode==='beta' ? '' : 'none';
+    document.getElementById('manRow').style.display  = S.mode==='manual'? '' : 'none';
+    S.forceFull = false;
+    draw();
+  });
+}
+
+// bind slider+number pairs
+function bindPair(rangeEl, numEl, onChange){
+  const sync = v => { rangeEl.value = v; numEl.value = v; onChange(Number(v)); };
+  rangeEl.addEventListener('input', e => sync(e.target.value));
+  numEl.addEventListener('input', e => sync(e.target.value));
+  return v => sync(v);
+}
+
+const setParallax = bindPair(el('parallax'), el('parallaxN'), v=>{S.parallax=v; S.forceFull=false; draw();});
+const setBeta     = bindPair(el('beta'), el('betaN'), v=>{S.beta=v; S.forceFull=false; draw();});
+const setAx       = bindPair(el('ax'), el('axN'), v=>{S.ax=v; S.forceFull=false; draw();});
+const setAy       = bindPair(el('ay'), el('ayN'), v=>{S.ay=v; S.forceFull=false; draw();});
+const setTheta    = bindPair(el('theta'), el('thetaN'), v=>{S.theta=v; S.forceFull=false; draw();});
+const setPhase    = bindPair(el('phase'), el('phaseN'), v=>{S.phase=v; S.forceFull=false; draw();});
+const setMuX      = bindPair(el('muX'), el('muXN'), v=>{S.muX=v; S.forceFull=false; draw();});
+const setMuY      = bindPair(el('muY'), el('muYN'), v=>{S.muY=v; S.forceFull=false; draw();});
+const setYears    = bindPair(el('years'), el('yearsN'), v=>{S.years=v; el('tMax').textContent=v; el('tSlider').max=v; S.forceFull=false; draw();});
+const setPPY      = bindPair(el('ppy'), el('ppyN'), v=>{S.ppy=v; S.forceFull=false; draw();});
+const setJitter   = bindPair(el('jitter'), el('jitterN'), v=>{S.jitter=v; S.forceFull=false; draw();});
+
+// checkboxes
+el('flipX').addEventListener('change', e=>{S.flipX=e.target.checked; draw();});
+el('showLines').addEventListener('change', e=>{S.showLines=e.target.checked; draw();});
+el('showPM').addEventListener('change', e=>{S.showPM=e.target.checked; draw();});
+el('showRef').addEventListener('change', e=>{S.showRef=e.target.checked; draw();});
+
+// reset & save
+el('resetBtn').addEventListener('click', ()=>{
+  setParallax(100); setBeta(30); setAx(100); setAy(50); setTheta(30); setPhase(0);
+  setMuX(-150); setMuY(80); setYears(3); setPPY(12); setJitter(0);
+  document.querySelector('input[name=mode][value=beta]').checked = true; S.mode='beta';
+  el('flipX').checked = S.flipX = true; el('showLines').checked = S.showLines = true;
+  el('showPM').checked = S.showPM = true; el('showRef').checked = S.showRef = true;
+  S.playing=false; S.t=0; el('tSlider').value=0; el('tLabel').textContent='0';
+  S.useSchedule=false; el('useSched').checked=false; S.sched=[];
+  S.forceFull=false;
+  draw();
+});
+el('saveBtn').addEventListener('click', ()=>{
+  let src = new XMLSerializer().serializeToString(plot);
+  if(!src.match(/^<svg[^>]+xmlns="http:\/\/www.w3.org\/2000\/svg"/)){
+    src = src.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+  const blob = new Blob([src], {type:'image/svg+xml;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='pm_parallax_simulator.svg'; a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ---- Animation bindings ----
+const playBtn = el('playBtn');
+const showAllBtn = el('showAllBtn');
+const tSlider = el('tSlider');
+const tLabel  = el('tLabel');
+const speedEl = el('speed');
+const speedLabel = el('speedLabel');
+let timerId = null;
+
+playBtn.addEventListener('click', ()=>{
+  S.playing = !S.playing;
+  S.forceFull = false;
+  playBtn.textContent = S.playing ? '일시정지' : '재생';
+  if (S.playing) {
+    if (timerId) clearInterval(timerId);
+    timerId = setInterval(()=>{
+      S.t += 0.02 * S.speed; // ~0.02 yr per 50 ms
+      if (S.t > S.years) S.t = 0;
+      tSlider.value = S.t; tLabel.textContent = fmt(S.t);
+      draw();
+    }, 50);
+  } else if (timerId) { clearInterval(timerId); timerId = null; }
+});
+
+showAllBtn.addEventListener('click', ()=>{
+  // 애니메이션을 끄고 전체 경로 한 번에 표시
+  if (timerId) { clearInterval(timerId); timerId = null; }
+  S.playing = false;
+  playBtn.textContent = '재생';
+  S.t = S.years;
+  tSlider.value = S.t; tLabel.textContent = fmt(S.t);
+  S.forceFull = true;    // draw에서 전체 궤적을 강제로 그림
+  draw();
+});
+
+tSlider.addEventListener('input', (e)=>{ S.t = +e.target.value; tLabel.textContent = fmt(S.t); S.forceFull=false; draw(); });
+speedEl.addEventListener('input', (e)=>{ S.speed = +e.target.value; speedLabel.textContent = `${S.speed}×`; });
+
+// ---- Schedule bindings ----
+el('useSched').addEventListener('change', e=>{ S.useSchedule = e.target.checked; S.forceFull=false; draw(); });
+el('csvFile').addEventListener('change', e=>{
+  const f = e.target.files?.[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = (ev)=>{
+    const txt = String(ev.target.result || '');
+    const vals = txt.split(/[\n,\t;\r]+/).map(s=>parseFloat(s.trim())).filter(v=>!Number.isNaN(v));
+    S.sched = vals; S.forceFull=false; draw();
+  };
+  r.readAsText(f);
+});
+
+// ---- Compute / Draw ----
+function compute(){
+  const Ax = S.mode==='beta' ? S.parallax : S.ax;
+  const Ay = S.mode==='beta' ? S.parallax * Math.abs(Math.sin(deg2rad(S.beta))) : S.ay;
+
+  let times;
+  if (S.useSchedule && S.sched.length) {
+    times = S.sched.filter(t=>t>=0 && t<=S.years).slice().sort((a,b)=>a-b);
+    if (times[0] !== 0) times = [0, ...times];
+    if (times[times.length-1] !== S.years) times = [...times, S.years];
+  } else {
+    const total = Math.max(2, Math.round(S.years * S.ppy) + 1);
+    const dt = 1 / S.ppy;
+    times = Array.from({length: total}, (_,i)=>{
+      const base=i*dt; const j=(S.jitter>0 && i>0 && i<total-1)? (Math.random()*2-1)*S.jitter*dt:0;
+      return Math.min(S.years, Math.max(0, base+j));
+    }).sort((a,b)=>a-b);
+  }
+
+  const pts = times.map(t=>{
+    const pmx=S.muX*t, pmy=S.muY*t;
+    const ellX=Ax*Math.cos(2*Math.PI*t+deg2rad(S.phase));
+    const ellY=Ay*Math.sin(2*Math.PI*t+deg2rad(S.phase));
+    const [px,py]=rotate(ellX,ellY,S.theta);
+    return {t, x: pmx+px, y: pmy+py};
+  });
+
+  // bounds (equal aspect)
+  let minX=Math.min(...pts.map(p=>p.x)), maxX=Math.max(...pts.map(p=>p.x));
+  let minY=Math.min(...pts.map(p=>p.y)), maxY=Math.max(...pts.map(p=>p.y));
+  const pad=0.10; let rX=maxX-minX||1, rY=maxY-minY||1; const R=Math.max(rX,rY); rX=rY=R;
+  const cx=(maxX+minX)/2, cy=(maxY+minY)/2;
+  const box={minX:cx-(1+pad)*rX/2, maxX:cx+(1+pad)*rX/2, minY:cy-(1+pad)*rY/2, maxY:cy+(1+pad)*rY/2};
+
+  // reference ellipse
+  const ref=Array.from({length:361},(_,i)=>{
+    const a=deg2rad(i);
+    const [px,py]=rotate(Ax*Math.cos(a+deg2rad(S.phase)), Ay*Math.sin(a+deg2rad(S.phase)), S.theta);
+    return {x:px,y:py};
+  });
+
+  const mu=Math.hypot(S.muX,S.muY);
+  const muPA=(rad2deg(Math.atan2(S.muX,S.muY))+360)%360;
+  return {pts, ref, box, mu, muPA};
+}
+
+function draw(){
+  const {pts, ref, box, mu, muPA} = compute();
+  // scales
+  const ml=80, mt=24, w=676, h=436; const flip = el('flipX').checked;
+  const xScale = x => { const u=(x-box.minX)/(box.maxX-box.minX); return ml + (flip? w*(1-u): w*u); };
+  const yScale = y => { const u=(y-box.minY)/(box.maxY-box.minY); return mt + h*(1-u); };
+
+  // grid
+  gridG.innerHTML='';
+  const step = Math.max(niceStep(box.maxX-box.minX), niceStep(box.maxY-box.minY));
+  for(let v=Math.ceil(box.minX/step)*step; v<=box.maxX+1e-6; v+=step){
+    const x=xScale(v);
+    gridG.insertAdjacentHTML('beforeend', `<line x1="${x}" y1="${mt}" x2="${x}" y2="${mt+h}" stroke="#eef2f7" />`);
+    gridG.insertAdjacentHTML('beforeend', `<line x1="${x}" y1="${mt+h}" x2="${x}" y2="${mt+h+6}" stroke="#9ca3af" />`);
+    gridG.insertAdjacentHTML('beforeend', `<text x="${x}" y="${mt+h+20}" text-anchor="middle" font-size="10">${fmt(v)}</text>`);
+  }
+  for(let v=Math.ceil(box.minY/step)*step; v<=box.maxY+1e-6; v+=step){
+    const y=yScale(v);
+    gridG.insertAdjacentHTML('beforeend', `<line x1="${ml}" y1="${y}" x2="${ml+w}" y2="${y}" stroke="#eef2f7" />`);
+    gridG.insertAdjacentHTML('beforeend', `<line x1="${ml-6}" y1="${y}" x2="${ml}" y2="${y}" stroke="#9ca3af" />`);
+    gridG.insertAdjacentHTML('beforeend', `<text x="${ml-10}" y="${y+3}" text-anchor="end" font-size="10">${fmt(v)}</text>`);
+  }
+
+  // guides
+  guidesG.innerHTML='';
+  if(el('showRef').checked){
+    const d = ref.map((p,i)=>`${i? 'L':'M'} ${xScale(p.x)} ${yScale(p.y)}`).join(' ');
+    guidesG.insertAdjacentHTML('beforeend', `<path d="${d}" fill="none" stroke="#9ca3af" stroke-dasharray="4 4"/>`);
+  }
+  if(el('showPM').checked){
+    const x0=xScale(0), y0=yScale(0), x1=xScale(S.muX*S.years), y1=yScale(S.muY*S.years);
+    guidesG.insertAdjacentHTML('beforeend', `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="#94a3b8" stroke-dasharray="6 6"/>`);
+  }
+
+  // path + points
+  const ptsDraw = S.playing ? pts.filter(p=>p.t <= S.t) : (S.forceFull ? pts : pts);
+  pathEl.setAttribute('points', ptsDraw.map(p=>`${xScale(p.x)},${yScale(p.y)}`).join(' '));
+  pointsG.innerHTML = ptsDraw.map((p,i)=>{
+    const core = `<circle cx="${xScale(p.x)}" cy="${yScale(p.y)}" r="3" fill="#2563eb"/>`;
+    const lbl = (i % Number(el('ppy').value) === 0) ? `<text x="${xScale(p.x)+6}" y="${yScale(p.y)-6}" font-size="10" fill="#374151">t=${fmt(p.t)}y</text>` : '';
+    return `<g>${core}${lbl}</g>`;
+  }).join('');
+  if (S.playing) {
+    const idx = pts.findIndex(p=>p.t > S.t);
+    const prev = idx<=0 ? pts[0] : pts[idx-1];
+    const next = idx<0 ? pts[pts.length-1] : (pts[idx]||prev);
+    const u = next.t===prev.t ? 0 : (S.t - prev.t)/(next.t - prev.t);
+    const x = prev.x + (next.x - prev.x)*u;
+    const y = prev.y + (next.y - prev.y)*u;
+    pointsG.insertAdjacentHTML('beforeend', `<circle cx="${xScale(x)}" cy="${yScale(y)}" r="5" fill="#ef4444"/>`);
+  }
+
+  // readout
+  readout.innerHTML =
+    `현재 설정: ${document.querySelector('input[name=mode]:checked').value==='beta' ? `p=${fmt(el('parallax').value)} mas, β=${fmt(el('beta').value)}° (Ay=p·sin|β|)` : `Ax=${fmt(el('ax').value)} mas, Ay=${fmt(el('ay').value)} mas`} , θ=${fmt(el('theta').value)}°, φ=${fmt(el('phase').value)}°. ` +
+    `고유운동: μ_RA=${fmt(el('muX').value)}, μ_Dec=${fmt(el('muY').value)} mas/yr → |μ|=${fmt(Math.hypot(el('muX').value,el('muY').value))} mas/yr. ` +
+    `표본: ${pts.length} points over ${S.years} yr, ${S.ppy} pts/yr, jitter ±${Math.round(S.jitter*100)}%.`;
+  el('tLabel').textContent = fmt(S.t);
+  el('tMax').textContent = S.years;
+}
+
+// 첫 렌더
+setTimeout(draw, 0);
+</script>
+</body>
+</html>
