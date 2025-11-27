@@ -7,6 +7,7 @@
 - `binary_lightcurve.py`: 별, 식쌍성 궤도, 광도 곡선 계산 로직을 담은 모듈
 - `simulate.py`: 명령행에서 시뮬레이션을 실행하고 CSV·PNG 그래프로 광도 곡선을 저장하는 스크립트
 - `app.py`: Streamlit 기반으로 슬라이더를 제공하는 실시간 광도곡선 데스크톱 웹앱
+- `missing_star_app.py`: 임의의 별을 숨긴 천정(zenith) 성도 문제·정답 이미지를 생성하는 Streamlit 앱
 
 ## 빠른 시작
 
@@ -19,6 +20,11 @@
 1. 의존성 설치: `pip install streamlit plotly` (matplotlib 없이도 실행 가능)
 2. 아래 명령으로 앱 실행: `streamlit run app.py`
 3. 사이드바에서 반지름, 온도, 경사각, 이심률, 질량, 장반경, 샘플 개수를 슬라이더/입력으로 조정하면 그래프와 주기가 즉시 갱신됩니다.
+
+### 별 숨기기 성도 생성기 (Streamlit)
+1. 의존성 설치: `pip install -r requirements.txt` (추가로 `starplot` 필요)
+2. 명령으로 실행: `streamlit run missing_star_app.py`
+3. 날짜/시간, 관측 위치(위도·경도), 밝기 등급 한계를 입력 후 “👉 성도 생성하기”를 클릭하면 문제·정답 성도 PNG와 숨겨진 별 목록이 표시됩니다.
 
 ### CLI로 CSV 저장
 ```bash
