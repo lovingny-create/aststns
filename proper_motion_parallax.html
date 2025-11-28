@@ -339,12 +339,8 @@ function compute(){
     return {t, x: pmx+px, y: pmy+py};
   });
 
-  // bounds (equal aspect)
-  let minX=Math.min(...pts.map(p=>p.x)), maxX=Math.max(...pts.map(p=>p.x));
-  let minY=Math.min(...pts.map(p=>p.y)), maxY=Math.max(...pts.map(p=>p.y));
-  const pad=0.10; let rX=maxX-minX||1, rY=maxY-minY||1; const R=Math.max(rX,rY); rX=rY=R;
-  const cx=(maxX+minX)/2, cy=(maxY+minY)/2;
-  const box={minX:cx-(1+pad)*rX/2, maxX:cx+(1+pad)*rX/2, minY:cy-(1+pad)*rY/2, maxY:cy+(1+pad)*rY/2};
+  const minX=Math.min(...pts.map(p=>p.x)), maxX=Math.max(...pts.map(p=>p.x));
+  const minY=Math.min(...pts.map(p=>p.y)), maxY=Math.max(...pts.map(p=>p.y));
 
   // reference ellipse
   const ref=Array.from({length:361},(_,i)=>{
@@ -355,13 +351,31 @@ function compute(){
 
   const mu=Math.hypot(S.muX,S.muY);
   const muPA=(rad2deg(Math.atan2(S.muX,S.muY))+360)%360;
-  return {pts, ref, box, mu, muPA};
+  return {pts, ref, bounds:{minX, maxX, minY, maxY}, mu, muPA};
 }
 
 function draw(){
-  const {pts, ref, box, mu, muPA} = compute();
+  const {pts, ref, bounds, mu, muPA} = compute();
   // scales
   const ml=80, mt=24, w=676, h=436; const flip = el('flipX').checked;
+
+  // bounding box with equal axis scale respecting viewport aspect
+  const pad=0.10;
+  let {minX, maxX, minY, maxY} = bounds;
+  let rX = Math.max(1e-6, maxX - minX);
+  let rY = Math.max(1e-6, maxY - minY);
+  const cx = (maxX + minX) / 2;
+  const cy = (maxY + minY) / 2;
+  const targetRatio = w / h;
+  if (rX / rY < targetRatio) {
+    rX = rY * targetRatio;
+  } else {
+    rY = rX / targetRatio;
+  }
+  rX *= (1 + pad);
+  rY *= (1 + pad);
+  const box={minX:cx - rX/2, maxX:cx + rX/2, minY:cy - rY/2, maxY:cy + rY/2};
+
   const xScale = x => { const u=(x-box.minX)/(box.maxX-box.minX); return ml + (flip? w*(1-u): w*u); };
   const yScale = y => { const u=(y-box.minY)/(box.maxY-box.minY); return mt + h*(1-u); };
 
