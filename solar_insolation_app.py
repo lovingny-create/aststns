@@ -146,7 +146,7 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     peri_xR, peri_yR = peri_x, peri_y
     ap_xR, ap_yR = ap_x, ap_y
 
-    fig, ax = plt.subplots(figsize=(5, 5), facecolor="#0a0f1c")
+    fig, ax = plt.subplots(figsize=(2.8, 2.8), facecolor="#0a0f1c")
     ax.set_facecolor("#0a0f1c")
 
     ax.plot(xR, yR, linestyle="--", color="#4db7ff", linewidth=2)
@@ -313,12 +313,18 @@ if minutes == 60:
     hours += 1
     minutes = 0
 
+# 단순한 평균 기온 추정 (위도와 계절 위상 기반의 학습용 모델)
+season_phase = 2 * math.pi * (active_N - 80) / 365.0
+base_temp = 15 - (abs(phi_deg) / 90.0) * 30
+seasonal_amp = 10 * math.sqrt(max(math.cos(math.radians(phi_deg)), 0))
+avg_temp = base_temp + seasonal_amp * math.sin(season_phase)
+
 info_table_html = f"""
 <style>
 .info-table {{
   width: 100%;
   border-collapse: collapse;
-  font-size: 15px;
+  font-size: 14px;
   table-layout: fixed;
 }}
 .info-table th {{
@@ -334,34 +340,43 @@ info_table_html = f"""
   border-bottom: 1px solid #e5e7eb;
   color: #111827;
   font-weight: 700;
-  text-align: left;
+  text-align: center;
 }}
-.info-table td.value {{ text-align: right; color: #0f172a; }}
+.info-table td.value {{ text-align: center; color: #0f172a; }}
 </style>
 <table class="info-table">
   <tr>
-    <th>항목</th>
-    <th>값</th>
+    <th>입력 날짜</th>
+    <th>위도</th>
+    <th>태양 적위</th>
+    <th>정오 고도</th>
+    <th>일사량</th>
+    <th>낮 길이</th>
+    <th>평균 기온</th>
   </tr>
-  <tr><td>입력 날짜</td><td class="value">{st.session_state.month}월 {st.session_state.day}일</td></tr>
-  <tr><td>위도</td><td class="value">{phi_deg:.1f}°</td></tr>
-  <tr><td>태양 적위</td><td class="value">{math.degrees(delta):.2f}°</td></tr>
-  <tr><td>정오 고도</td><td class="value">{alpha_noon:.2f}°</td></tr>
-  <tr><td>일사량</td><td class="value">{Q_at_lat:.0f} W/m²</td></tr>
-  <tr><td>낮 길이</td><td class="value">{hours}시간 {minutes:02d}분</td></tr>
+  <tr>
+    <td class="value">{st.session_state.month}월 {st.session_state.day}일</td>
+    <td class="value">{phi_deg:.1f}°</td>
+    <td class="value">{math.degrees(delta):.2f}°</td>
+    <td class="value">{alpha_noon:.2f}°</td>
+    <td class="value">{Q_at_lat:.0f} W/m²</td>
+    <td class="value">{hours}시간 {minutes:02d}분</td>
+    <td class="value">{avg_temp:.1f}°C</td>
+  </tr>
 </table>
 """
 
-st.subheader("🛰️ 지구 공전 궤도")
-fig_orbit = draw_orbit(e, omega_deg, E_val, epsilon_deg)
-st.pyplot(fig_orbit)
+top_col_orbit, top_col_chart = st.columns([1, 1])
 
-col_chart, col_info = st.columns([1.05, 0.95])
+with top_col_orbit:
+    st.subheader("🛰️ 지구 공전 궤도")
+    fig_orbit = draw_orbit(e, omega_deg, E_val, epsilon_deg)
+    st.pyplot(fig_orbit)
 
-with col_chart:
+with top_col_chart:
     st.subheader("📈 위도별 하루 태양 에너지량 (W/m²)")
 
-    figQ, axQ = plt.subplots(figsize=(5, 3.2))
+    figQ, axQ = plt.subplots(figsize=(2.8, 2.8))
     axQ.plot(phi_list, Q)
     axQ.axvline(phi_deg, color="red", linestyle="--")
     axQ.grid(alpha=0.3)
@@ -370,9 +385,8 @@ with col_chart:
     figQ.tight_layout(pad=0.5)
     st.pyplot(figQ)
 
-with col_info:
-    st.subheader("🌞 현재 태양 위치 정보")
-    st.markdown(info_table_html, unsafe_allow_html=True)
+st.subheader("🌞 현재 태양 위치 정보")
+st.markdown(info_table_html, unsafe_allow_html=True)
 
 
 # --------------------------------------------
