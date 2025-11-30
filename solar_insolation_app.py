@@ -216,31 +216,44 @@ def draw_sun_path(phi_deg: float, delta: float, epsilon_deg: float):
 
     fig, ax = plt.subplots(figsize=(2.8, 2.8))
 
-    dome_x = np.linspace(-1, 1, 200)
-    dome_y = np.sqrt(1 - dome_x ** 2)
-    ax.fill_between(dome_x, dome_y, 0, color="#f8fafc", alpha=0.7, edgecolor="#cbd5e1")
-    ax.plot(dome_x, dome_y, color="#94a3b8", linewidth=1.2)
+    # 3D 느낌을 주기 위한 원근 변환 값
+    x_scale = 1.15
+    y_scale = 0.9
+    ground_ellipse = np.linspace(0, 2 * np.pi, 240)
+    gx = np.cos(ground_ellipse) * x_scale
+    gy = np.sin(ground_ellipse) * 0.35
+
+    # 돔과 지면
+    dome_t = np.linspace(-np.pi / 2, np.pi / 2, 240)
+    dome_x = x_scale * np.cos(dome_t)
+    dome_y = y_scale * (np.sin(dome_t) + 1) / 2
+    ax.fill_between(dome_x, dome_y, 0, color="#eef2ff", alpha=0.75, edgecolor="#cbd5e1")
+    ax.fill(gx, gy, color="#d9d2b2", alpha=0.85, edgecolor="#b59d73", linewidth=1)
+    ax.plot(dome_x, dome_y, color="#9ca3af", linewidth=1.2)
+    ax.plot(gx, gy, color="#b59d73", linewidth=0.8)
 
     for dec, label, color in zip(declinations, labels, colors):
         x, y, noon_alt = sun_path_curve(phi_rad, dec)
-        ax.plot(x, y, color=color, linewidth=1.2, label=f"{label} (δ={math.degrees(dec):.1f}°)")
-        ax.scatter([0], [math.sin(noon_alt)], color=color, s=35, zorder=3)
+        x3d = x * x_scale
+        y3d = 0.35 + y * y_scale
+        ax.plot(x3d, y3d, color=color, linewidth=1.2, label=f"{label} (δ={math.degrees(dec):.1f}°)")
+        ax.scatter([0], [0.35 + math.sin(noon_alt) * y_scale], color=color, s=30, zorder=3)
 
     x_sel, y_sel, noon_alt_sel = sun_path_curve(phi_rad, delta)
-    ax.plot(x_sel, y_sel, color="#ff6b6b", linewidth=1.8, label="선택 날짜")
-    ax.scatter([0], [math.sin(noon_alt_sel)], color="#ff6b6b", s=40, zorder=4)
+    ax.plot(x_sel * x_scale, 0.35 + y_sel * y_scale, color="#ff6b6b", linewidth=1.8, label="선택 날짜")
+    ax.scatter([0], [0.35 + math.sin(noon_alt_sel) * y_scale], color="#ff6b6b", s=36, zorder=4)
 
-    ax.scatter(0, 0, color="#d97757", s=30)
-    ax.text(0, -0.06, "관측자", fontsize=8, ha="center", va="top", color="#0f172a")
+    ax.scatter(0, 0.35, color="#9f7050", s=26, zorder=5)
+    ax.text(0, 0.28, "관측자", fontsize=8, ha="center", va="top", color="#0f172a")
 
-    ax.set_xlim(-1.05, 1.05)
-    ax.set_ylim(0, 1.05)
+    ax.set_xlim(-1.25, 1.25)
+    ax.set_ylim(0, 1.3)
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_aspect("equal")
     ax.legend(loc="upper right", fontsize=7, frameon=False)
     ax.set_title("하늘에서 본 태양 경로", fontsize=11)
-    fig.tight_layout(pad=0.4)
+    fig.tight_layout(pad=0.35)
     return fig
 
 
