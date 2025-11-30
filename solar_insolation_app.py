@@ -244,7 +244,7 @@ def draw_sun_path(phi_deg: float, delta: float, epsilon_deg: float):
 # ============================================
 # STREAMLIT APP (학생용)
 # ============================================
-st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(layout="wide")
 ensure_korean_font()
 
 st.title("밀란코비치 주기에 따른 기후 변화")
@@ -253,10 +253,8 @@ st.title("밀란코비치 주기에 따른 기후 변화")
 st.markdown(
     """
     <style>
-    .block-container { padding-top: 1.0rem; padding-bottom: 1.3rem; }
+    .block-container { padding-top: 1.3rem; padding-bottom: 1.3rem; }
     h1 { margin-bottom: 0.4rem; }
-    /* Hide the unused sidebar so controls do not render twice on narrow screens */
-    [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
     body { background-color: white; }
     </style>
     """,
@@ -282,8 +280,6 @@ if "day" not in st.session_state:
     st.session_state.day = INIT_DAY
 if "anim_speed" not in st.session_state:
     st.session_state.anim_speed = INIT_SPEED
-if "anim_speed_slider" not in st.session_state:
-    st.session_state.anim_speed_slider = INIT_SPEED
 if "phi_deg" not in st.session_state:
     st.session_state.phi_deg = INIT_PHI
 if "e" not in st.session_state:
@@ -305,25 +301,12 @@ def reset_state():
     st.session_state.epsilon_deg = INIT_EPS
     st.session_state.phi_deg = INIT_PHI
     st.session_state.anim_speed = INIT_SPEED
-    st.session_state.anim_speed_slider = INIT_SPEED
 
 # --------------------------------------------
-# 입력 UI (메인 영역 상단)
+# 입력 UI (사이드바)
 # --------------------------------------------
-ctrl = st.container()
-with ctrl:
-    st.markdown(
-        """
-        <style>
-        .stButton>button {
-            white-space: nowrap;
-            font-size: 13px;
-            padding: 0.3rem 0.6rem;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+with st.sidebar:
+    st.subheader("날짜 선택")
 
     # 애니메이션 중에는 month/day 자동 갱신
     if st.session_state.animate:
@@ -331,8 +314,7 @@ with ctrl:
         st.session_state.month = m
         st.session_state.day = d
 
-    st.subheader("날짜 선택")
-    date_cols = st.columns([1, 1, 2, 2])
+    date_cols = st.columns(2)
     month = int(
         date_cols[0].selectbox("월", list(range(1, 13)), index=st.session_state.month - 1)
     )
@@ -347,26 +329,26 @@ with ctrl:
     st.session_state.month = month
     st.session_state.day = day
 
-    spacer_L, cA, cB, cC, cD, spacer_R = st.columns([1, 1, 1, 1, 1, 1])
-    if cA.button("춘분"):
+    shortcuts = st.columns(4)
+    if shortcuts[0].button("춘분"):
         st.session_state.month = 3
         st.session_state.day = 20
         st.session_state.animate = False
         trigger_rerun()
 
-    if cB.button("하지"):
+    if shortcuts[1].button("하지"):
         st.session_state.month = 6
         st.session_state.day = 21
         st.session_state.animate = False
         trigger_rerun()
 
-    if cC.button("추분"):
+    if shortcuts[2].button("추분"):
         st.session_state.month = 9
         st.session_state.day = 22
         st.session_state.animate = False
         trigger_rerun()
 
-    if cD.button("동지"):
+    if shortcuts[3].button("동지"):
         st.session_state.month = 12
         st.session_state.day = 21
         st.session_state.animate = False
@@ -395,6 +377,9 @@ with ctrl:
     e = st.slider("이심률 e", 0.0, 0.1, 0.0167, 0.0001, key="e")
     omega_deg = st.slider("세차(ω)", 0.0, 360.0, 102.9372, key="omega_deg")
     epsilon_deg = st.slider("축 경사(ε)", 0.0, 40.0, 23.44, key="epsilon_deg")
+
+    st.subheader("애니메이션 속도")
+    st.session_state.anim_speed = st.slider("속도(ms)", 1, 200, st.session_state.anim_speed)
 
 # --------------------------------------------
 # 메인 패널
@@ -489,7 +474,7 @@ with top_col_orbit:
     fig_orbit = draw_orbit(e, omega_deg, E_val, epsilon_deg)
     st.pyplot(fig_orbit)
 
-    ctrl_cols = st.columns([1, 1, 1, 1.9])
+    ctrl_cols = st.columns([1, 1, 1])
 
     with ctrl_cols[0]:
         if st.button("▶", help="재생"):
@@ -504,13 +489,6 @@ with top_col_orbit:
         if st.button("↺", help="처음 상태로 초기화"):
             reset_state()
             trigger_rerun()
-
-    with ctrl_cols[3]:
-        st.markdown("<div style='margin-top:2px'></div>", unsafe_allow_html=True)
-        anim_speed = st.slider(
-            "속도(ms)", 1, 200, st.session_state.anim_speed, key="anim_speed_slider"
-        )
-        st.session_state.anim_speed = anim_speed
 
 with top_col_chart:
     st.subheader("📈 위도별 하루 태양 에너지량 (W/m²)")
