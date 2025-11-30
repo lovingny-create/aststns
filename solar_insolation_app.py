@@ -128,27 +128,23 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
 
     a = 1.0
     b = a * math.sqrt(1 - e_vis * e_vis)
-    omega = math.radians(omega_deg)
     eps = math.radians(epsilon_deg)
+    view_tilt = math.radians(15)  # 공전면을 약간 위에서 내려다보기
 
     E_all = np.linspace(0, 2 * np.pi, 500)
     x = -a * (np.cos(E_all) - e_vis)
-    y = b * np.sin(E_all)
+    y = b * np.sin(E_all) * math.cos(view_tilt)
 
-    xR = x * np.cos(omega) - y * np.sin(omega)
-    yR = x * np.sin(omega) + y * np.cos(omega)
+    xR, yR = x, y
 
     xE = -a * (math.cos(E_now) - e_vis)
-    yE = b * math.sin(E_now)
-    xE_R = xE * np.cos(omega) - yE * np.sin(omega)
-    yE_R = xE * np.sin(omega) + yE * np.cos(omega)
+    yE = b * math.sin(E_now) * math.cos(view_tilt)
+    xE_R, yE_R = xE, yE
 
     peri_x, peri_y = -a * (1 - e_vis), 0
     ap_x, ap_y = a * (1 + e_vis), 0
-    peri_xR = peri_x * np.cos(omega) - peri_y * np.sin(omega)
-    peri_yR = peri_x * np.sin(omega) + peri_y * np.cos(omega)
-    ap_xR = ap_x * np.cos(omega) - ap_y * np.sin(omega)
-    ap_yR = ap_x * np.sin(omega) + ap_y * np.cos(omega)
+    peri_xR, peri_yR = peri_x, peri_y
+    ap_xR, ap_yR = ap_x, ap_y
 
     fig, ax = plt.subplots(figsize=(5, 5), facecolor="#0a0f1c")
     ax.set_facecolor("#0a0f1c")
@@ -160,7 +156,7 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     # 자전축
     L = 0.35
     dx = L * math.sin(eps)
-    dy = L * math.cos(eps)
+    dy = L * math.cos(eps) * math.cos(view_tilt)
     ax.plot(
         [xE_R - dx / 2, xE_R + dx / 2],
         [yE_R - dy / 2, yE_R + dy / 2],
@@ -212,6 +208,8 @@ if "epsilon_deg" not in st.session_state:
     st.session_state.epsilon_deg = 23.44
 if "phi_deg" not in st.session_state:
     st.session_state.phi_deg = 37.0
+if "anim_speed" not in st.session_state:
+    st.session_state.anim_speed = 30
 
 # --------------------------------------------
 # 입력 UI
@@ -284,42 +282,71 @@ with st.sidebar:
     st.subheader("관측자 위도")
     phi_deg = st.slider("위도", -90.0, 90.0, st.session_state.phi_deg, key="phi_deg")
 
-    st.divider()
-    anim_speed = st.slider("애니메이션 속도(ms)", 1, 200, 30)
-
 # --------------------------------------------
 # 메인 패널
 # --------------------------------------------
-colL, colR = st.columns([1, 1])
+# 날짜 → N 변환
+active_N = (
+    day_of_year(st.session_state.month, st.session_state.day)
+    if not st.session_state.animate
+    else st.session_state.N
+)
 
-with colL:
-    # 날짜 → N 변환
-    active_N = (
-        day_of_year(st.session_state.month, st.session_state.day)
-        if not st.session_state.animate
-        else st.session_state.N
-    )
+M = mean_anomaly(active_N)
+E_val = eccentric_anomaly(M, e)
+v = true_anomaly(E_val, e)
+delta, lam = solar_declination(v, omega_deg, epsilon_deg)
 
-    M = mean_anomaly(active_N)
-    E_val = eccentric_anomaly(M, e)
-    v = true_anomaly(E_val, e)
-    delta, lam = solar_declination(v, omega_deg, epsilon_deg)
+phi_list = np.linspace(-90, 90, 181)
+phi_rad_all = np.radians(phi_list)
+Q = daily_insolation(phi_rad_all, delta, e, lam, omega_deg)
 
-    fig_orbit = draw_orbit(e, omega_deg, E_val, epsilon_deg)
-    st.pyplot(fig_orbit)
+phi_rad = math.radians(phi_deg)
+alpha_noon = solar_noon_altitude(phi_rad, delta)
+Q_at_lat = float(daily_insolation(np.array([phi_rad]), delta, e, lam, omega_deg)[0])
 
-with colR:
+cosH0 = -math.tan(phi_rad) * math.tan(delta)
+cosH0 = max(-1.0, min(1.0, cosH0))
+H0 = math.acos(cosH0)
+daylight_hours = 24 * H0 / math.pi
+hours = int(daylight_hours)
+minutes = round((daylight_hours - hours) * 60)
+if minutes == 60:
+    hours += 1
+    minutes = 0
+
+info_table_html = """
+<style>
+.info-table {width: 100%; border-collapse: collapse; font-size: 15px;}
+.info-table td {padding: 8px 10px; border-bottom: 1px solid #e0e0e0;}
+.info-label {color: #4b5563; font-weight: 600; white-space: nowrap;}
+.info-value {color: #111827; font-weight: 700; text-align: right;}
+</style>
+<table class="info-table">
+  <tr><td class="info-label">입력 날짜</td><td class="info-value">{date_text}</td></tr>
+  <tr><td class="info-label">태양 적위</td><td class="info-value">{decl_text}</td></tr>
+  <tr><td class="info-label">위도</td><td class="info-value">{lat_text}</td></tr>
+</table>
+""".format(
+    date_text=f"{st.session_state.month}월 {st.session_state.day}일",
+    decl_text=f"{math.degrees(delta):.2f}°",
+    lat_text=f"{phi_deg:.1f}°",
+)
+
+col_info, col_chart = st.columns([0.95, 1.05])
+
+with col_info:
     st.subheader("🌞 현재 태양 위치 정보")
+    st.markdown(info_table_html, unsafe_allow_html=True)
 
-    st.markdown(f"**입력 날짜:** {st.session_state.month}월 {st.session_state.day}일")
-    st.markdown(f"**태양 적위:** {math.degrees(delta):.2f}°")
-    st.markdown(f"**위도:** {phi_deg}°")
+    st.subheader("🌅 남중고도 · 일사량 · 낮 길이")
+    c_alt, c_q, c_daylen = st.columns(3)
+    c_alt.metric("정오 고도", f"{alpha_noon:.2f}°")
+    c_q.metric("일사량", f"{Q_at_lat:.0f} W/m²")
+    c_daylen.metric("낮 길이", f"{hours}시간 {minutes:02d}분")
 
-    # 일사량
+with col_chart:
     st.subheader("📈 위도별 하루 태양 에너지량 (W/m²)")
-    phi_list = np.linspace(-90, 90, 181)
-    phi_rad_all = np.radians(phi_list)
-    Q = daily_insolation(phi_rad_all, delta, e, lam, omega_deg)
 
     figQ, axQ = plt.subplots(figsize=(5, 3.2))
     axQ.plot(phi_list, Q)
@@ -330,26 +357,9 @@ with colR:
     figQ.tight_layout(pad=0.5)
     st.pyplot(figQ)
 
-    # 남중고도
-    phi_rad = math.radians(phi_deg)
-    alpha_noon = solar_noon_altitude(phi_rad, delta)
-    Q_at_lat = float(daily_insolation(np.array([phi_rad]), delta, e, lam, omega_deg)[0])
-
-    cosH0 = -math.tan(phi_rad) * math.tan(delta)
-    cosH0 = max(-1.0, min(1.0, cosH0))
-    H0 = math.acos(cosH0)
-    daylight_hours = 24 * H0 / math.pi
-    hours = int(daylight_hours)
-    minutes = round((daylight_hours - hours) * 60)
-    if minutes == 60:
-        hours += 1
-        minutes = 0
-
-    st.subheader("🌅 남중고도 · 일사량 · 낮 길이")
-    c_alt, c_q, c_daylen = st.columns(3)
-    c_alt.metric("정오 고도", f"{alpha_noon:.2f}°")
-    c_q.metric("일사량", f"{Q_at_lat:.0f} W/m²")
-    c_daylen.metric("낮 길이", f"{hours}시간 {minutes:02d}분")
+st.subheader("🛰️ 지구 공전 궤도")
+fig_orbit = draw_orbit(e, omega_deg, E_val, epsilon_deg)
+st.pyplot(fig_orbit)
 
 
 # --------------------------------------------
@@ -357,17 +367,31 @@ with colR:
 # --------------------------------------------
 st.subheader("⏯ 날짜 자동 변화")
 
-c1, c2, c3 = st.columns(3)
-if c1.button("▶ Start"):
-    st.session_state.N = day_of_year(st.session_state.month, st.session_state.day)
-    st.session_state.animate = True
-if c2.button("⏸ Pause"):
-    st.session_state.animate = False
-if c3.button("↺ 1월 1일"):
-    st.session_state.N = 0
-    st.session_state.animate = False
+controls_col = st.container()
+btn_start, btn_pause, btn_reset, col_speed = controls_col.columns([1, 1, 1, 2.2])
+
+with btn_start:
+    if st.button("▶ Start"):
+        st.session_state.N = day_of_year(st.session_state.month, st.session_state.day)
+        st.session_state.animate = True
+
+with btn_pause:
+    if st.button("⏸ Pause"):
+        st.session_state.animate = False
+
+with btn_reset:
+    if st.button("↺ 1월 1일"):
+        st.session_state.N = 0
+        st.session_state.animate = False
+
+with col_speed:
+    st.markdown("<div style='margin-top:4px'></div>", unsafe_allow_html=True)
+    anim_speed = st.slider(
+        "애니메이션 속도(ms)", 1, 200, st.session_state.anim_speed, key="anim_speed_slider"
+    )
+    st.session_state.anim_speed = anim_speed
 
 if st.session_state.animate:
     st.session_state.N = (st.session_state.N + 1) % 365
-    time.sleep(anim_speed / 1000.0)
+    time.sleep(st.session_state.anim_speed / 1000.0)
     trigger_rerun()
