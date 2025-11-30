@@ -280,22 +280,17 @@ with colL:
 
 with colR:
     st.subheader("🌞 선택 날짜와 태양 위치")
-    top_stats = st.columns(3)
-    top_stats[0].metric("사용 중 N", f"{active_N}")
     if date_mode == "월·일로 입력":
-        top_stats[1].metric("달력 입력", f"{month}월 {day}일")
+        st.markdown(f"**입력한 날짜:** {month}월 {day}일")
     else:
         derived_month, derived_day = month_day_from_day_of_year(active_N)
-        top_stats[1].metric("달력 환산", f"{derived_month}월 {derived_day}일")
-    top_stats[2].metric("태양 적위", f"{math.degrees(delta):.2f}°")
-
-    if date_mode == "월·일로 입력":
-        st.markdown(f"**입력한 날짜:** {month}월 {day}일 · **위도:** {phi_deg:.1f}°")
-    else:
         st.markdown(
-            f"**슬라이더 N일차:** {active_N}일차 · **달력 환산:** {derived_month}월 {derived_day}일 · "
-            f"**위도:** {phi_deg:.1f}°"
+            f"**슬라이더 N일차:** {active_N}일차 · **달력 환산:** {derived_month}월 {derived_day}일"
         )
+
+    st.markdown(
+        f"**위도:** {phi_deg:.1f}° · **태양 적위:** {math.degrees(delta):.2f}°"
+    )
     phi_rad = math.radians(phi_deg)
     alpha_noon = solar_noon_altitude(phi_rad, delta)
 
@@ -322,9 +317,7 @@ with colR:
     st.divider()
     st.markdown(
         """
-        - 달력 N과 슬라이더 N을 분리해 비교할 수 있도록 상단에 배치했습니다.
         - 그래프에 면적 음영과 범례를 추가해 위도 변화에 따른 일사량의 흐름을 쉽게 읽을 수 있습니다.
-        - 핵심 수치를 상단 카드 형태로 정리해 한눈에 현재 상태를 파악할 수 있습니다.
         """
     )
 
