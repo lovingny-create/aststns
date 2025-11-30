@@ -166,9 +166,9 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     ax.set_facecolor("#0a0f1c")
 
     ax.plot(xR, yR, linestyle="--", color="#4db7ff", linewidth=1.6)
-    ax.scatter(0, 0, s=180, color="#0d5c84", edgecolors="white", linewidths=1.5, label="태양")
+    ax.scatter(0, 0, s=140, color="#0d5c84", edgecolors="white", linewidths=1.5)
     ax.text(0, 0, "☀", color="#ffef9f", fontsize=18, ha="center", va="center", weight="bold")
-    ax.scatter(xE_R, yE_R, s=90, color="#78ffba", edgecolors="#0a0f1c", linewidths=1.2, label="지구")
+    ax.scatter(xE_R, yE_R, s=70, color="#78ffba", edgecolors="#0a0f1c", linewidths=1.2)
 
     # 자전축
     L = 0.35
@@ -181,17 +181,14 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
         linewidth=2,
     )
 
-    # 근일점/원일점 라벨
-    ax.scatter(peri_xR, peri_yR, s=90, color="#78ffba", alpha=0.8)
-    ax.scatter(ap_xR, ap_yR, s=90, color="#78ffba", alpha=0.8)
-    ax.text(peri_xR - 0.04, peri_yR + 0.16, "근일점", color="white", ha="right", fontsize=10, weight="bold")
-    ax.text(ap_xR + 0.04, ap_yR + 0.16, "원일점", color="white", ha="left", fontsize=10, weight="bold")
+    # 근일점/원일점 마커만 표시
+    ax.scatter(peri_xR, peri_yR, s=70, color="#78ffba", alpha=0.9)
+    ax.scatter(ap_xR, ap_yR, s=70, color="#78ffba", alpha=0.9)
 
     ax.set_aspect("equal")
     R = 1 + e_vis + 0.55
     ax.set_xlim(-R, R)
     ax.set_ylim(-R, R)
-    ax.set_title("지구 공전 궤도", color="white", fontsize=12)
     ax.tick_params(colors="#0a0f1c", labelsize=6)  # hide coordinates
     ax.set_xticks([])
     ax.set_yticks([])
@@ -252,16 +249,38 @@ ensure_korean_font()
 
 st.title("밀란코비치 주기에 따른 기후 변화")
 
+# 상단 여백 축소 및 헤더 간격 조정
+st.markdown(
+    """
+    <style>
+    .block-container { padding-top: 0.6rem; padding-bottom: 1.3rem; }
+    h1 { margin-bottom: 0.4rem; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+INIT_MONTH = 3
+INIT_DAY = 21
+INIT_E = 0.0167
+INIT_OMEGA = 102.9372
+INIT_EPS = 23.44
+INIT_PHI = 37.0
+INIT_N = day_of_year(INIT_MONTH, INIT_DAY)
+INIT_SPEED = 30
+
 if "animate" not in st.session_state:
     st.session_state.animate = False
 if "N" not in st.session_state:
-    st.session_state.N = 80
+    st.session_state.N = INIT_N
 if "month" not in st.session_state:
-    st.session_state.month = 3
+    st.session_state.month = INIT_MONTH
 if "day" not in st.session_state:
-    st.session_state.day = 21
+    st.session_state.day = INIT_DAY
 if "anim_speed" not in st.session_state:
-    st.session_state.anim_speed = 30
+    st.session_state.anim_speed = INIT_SPEED
+if "phi_deg" not in st.session_state:
+    st.session_state.phi_deg = INIT_PHI
 
 # --------------------------------------------
 # 입력 UI
@@ -332,13 +351,29 @@ with st.sidebar:
         st.session_state.animate = False
         trigger_rerun()
 
+    st.subheader("관측자 위도")
+    lat_cols = st.columns([1, 1, 2.2])
+    with lat_cols[0]:
+        if st.button("−", help="위도 1° 감소"):
+            st.session_state.phi_deg = max(-90.0, st.session_state.phi_deg - 1)
+    with lat_cols[1]:
+        if st.button("+", help="위도 1° 증가"):
+            st.session_state.phi_deg = min(90.0, st.session_state.phi_deg + 1)
+    with lat_cols[2]:
+        phi_deg = st.number_input(
+            "위도 (°)",
+            -90.0,
+            90.0,
+            float(st.session_state.phi_deg),
+            step=0.5,
+            format="%.1f",
+        )
+        st.session_state.phi_deg = phi_deg
+
     st.subheader("밀란코비치 변수")
     e = st.slider("이심률 e", 0.0, 0.1, 0.0167, 0.0001, key="e")
     omega_deg = st.slider("세차(ω)", 0.0, 360.0, 102.9372, key="omega_deg")
     epsilon_deg = st.slider("축 경사(ε)", 0.0, 40.0, 23.44, key="epsilon_deg")
-
-    st.subheader("관측자 위도")
-    phi_deg = st.slider("위도", -90.0, 90.0, 37.0, key="phi_deg")
 
 # --------------------------------------------
 # 메인 패널
@@ -433,6 +468,38 @@ with top_col_orbit:
     fig_orbit = draw_orbit(e, omega_deg, E_val, epsilon_deg)
     st.pyplot(fig_orbit)
 
+    ctrl_cols = st.columns([1, 1, 1, 1.9])
+
+    with ctrl_cols[0]:
+        if st.button("▶", help="재생"):
+            st.session_state.N = day_of_year(st.session_state.month, st.session_state.day)
+            st.session_state.animate = True
+
+    with ctrl_cols[1]:
+        if st.button("⏸", help="일시정지"):
+            st.session_state.animate = False
+
+    with ctrl_cols[2]:
+        if st.button("↺", help="처음 상태로 초기화"):
+            st.session_state.month = INIT_MONTH
+            st.session_state.day = INIT_DAY
+            st.session_state.N = INIT_N
+            st.session_state.animate = False
+            st.session_state.e = INIT_E
+            st.session_state.omega_deg = INIT_OMEGA
+            st.session_state.epsilon_deg = INIT_EPS
+            st.session_state.phi_deg = INIT_PHI
+            st.session_state.anim_speed = INIT_SPEED
+            st.session_state.anim_speed_slider = INIT_SPEED
+            trigger_rerun()
+
+    with ctrl_cols[3]:
+        st.markdown("<div style='margin-top:2px'></div>", unsafe_allow_html=True)
+        anim_speed = st.slider(
+            "속도(ms)", 1, 200, st.session_state.anim_speed, key="anim_speed_slider"
+        )
+        st.session_state.anim_speed = anim_speed
+
 with top_col_chart:
     st.subheader("📈 위도별 하루 태양 에너지량 (W/m²)")
 
@@ -458,30 +525,6 @@ with top_col_sky:
     st.subheader("🌤️ 태양의 하늘 경로")
     fig_sky = draw_sun_path(phi_deg, delta, epsilon_deg)
     st.pyplot(fig_sky)
-
-    st.subheader("⏯ 날짜 자동 변화")
-    ctrl_cols = st.columns([1, 1, 1, 1.8])
-
-    with ctrl_cols[0]:
-        if st.button("▶ Start"):
-            st.session_state.N = day_of_year(st.session_state.month, st.session_state.day)
-            st.session_state.animate = True
-
-    with ctrl_cols[1]:
-        if st.button("⏸ Pause"):
-            st.session_state.animate = False
-
-    with ctrl_cols[2]:
-        if st.button("↺ 1월 1일"):
-            st.session_state.N = 0
-            st.session_state.animate = False
-
-    with ctrl_cols[3]:
-        st.markdown("<div style='margin-top:2px'></div>", unsafe_allow_html=True)
-        anim_speed = st.slider(
-            "애니메이션 속도(ms)", 1, 200, st.session_state.anim_speed, key="anim_speed_slider"
-        )
-        st.session_state.anim_speed = anim_speed
 
 st.subheader("🌞 현재 태양 위치 정보")
 st.markdown(info_table_html, unsafe_allow_html=True)
