@@ -1,0 +1,258 @@
+"""Streamlit app to explore Earth's orbit and daily insolation by latitude."""
+import math
+import time
+from typing import Tuple
+
+import matplotlib.pyplot as plt
+import numpy as np
+import streamlit as st
+
+# ============================================
+# 0. 날짜 → N일차
+# ============================================
+DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+
+def day_of_year(month: int, day: int) -> int:
+    """Return zero-based day of year for the provided month/day."""
+    safe_day = min(day, DAYS_IN_MONTH[month - 1])
+    return sum(DAYS_IN_MONTH[: month - 1]) + safe_day - 1  # 0-based
+
+
+# ============================================
+# 1. Mean anomaly
+# ============================================
+def mean_anomaly(N: int, M0_deg: float = -3.0) -> float:
+    deg_per_day = 360.0 / 365.25
+    M_deg = M0_deg + deg_per_day * N
+    return math.radians(M_deg)
+
+
+# ============================================
+# 2. Eccentric anomaly
+# ============================================
+def eccentric_anomaly(M: float, e: float, n_iter: int = 6) -> float:
+    E = M
+    for _ in range(n_iter):
+        f = E - e * math.sin(E) - M
+        fprime = 1 - e * math.cos(E)
+        E = E - f / fprime
+    return E
+
+
+# ============================================
+# 3. True anomaly
+# ============================================
+def true_anomaly(E: float, e: float) -> float:
+    num = math.sqrt(1 + e) * math.sin(E / 2)
+    den = math.sqrt(1 - e) * math.cos(E / 2)
+    v = 2 * math.atan2(num, den)
+    return v
+
+
+# ============================================
+# 4. Declination (태양 적위)
+# ============================================
+def solar_declination(v: float, omega_deg: float, epsilon_deg: float) -> Tuple[float, float]:
+    lam = v + math.radians(omega_deg)
+    eps = math.radians(epsilon_deg)
+    delta = math.asin(math.sin(eps) * math.sin(lam))
+    return delta, lam
+
+
+# ============================================
+# 5. 위도별 일사량
+# ============================================
+S0 = 1361  # solar constant
+
+
+def daily_insolation(phi_rad: np.ndarray, delta: float, e: float, lam: float, omega_deg: float) -> np.ndarray:
+    rfac = ((1 + e * math.cos(lam - math.radians(omega_deg))) / (1 - e * e)) ** 2
+
+    cosH0 = -np.tan(phi_rad) * np.tan(delta)
+    cosH0 = np.clip(cosH0, -1, 1)
+    H0 = np.arccos(cosH0)
+
+    Q = (S0 / math.pi) * rfac * (
+        H0 * np.sin(phi_rad) * np.sin(delta)
+        + np.cos(phi_rad) * np.cos(delta) * np.sin(H0)
+    )
+    return Q
+
+
+# ============================================
+# 6. 남중고도
+# ============================================
+def solar_noon_altitude(phi_rad: float, delta: float) -> float:
+    alpha = math.degrees(
+        math.asin(
+            math.sin(phi_rad) * math.sin(delta)
+            + math.cos(phi_rad) * math.cos(delta)
+        )
+    )
+    return alpha
+
+
+# ============================================
+# 7. 궤도 그림
+# ============================================
+def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
+    a = 1.0
+    b = a * math.sqrt(1 - e * e)
+    omega = math.radians(omega_deg)
+    eps = math.radians(epsilon_deg)
+
+    E_all = np.linspace(0, 2 * np.pi, 500)
+    x = a * (np.cos(E_all) - e)
+    y = b * np.sin(E_all)
+
+    # 회전
+    xR = x * np.cos(omega) - y * np.sin(omega)
+    yR = x * np.sin(omega) + y * np.cos(omega)
+
+    # 현재 지구 위치
+    xE = a * (math.cos(E_now) - e)
+    yE = b * math.sin(E_now)
+    xE_R = xE * np.cos(omega) - yE * np.sin(omega)
+    yE_R = xE * np.sin(omega) + yE * np.cos(omega)
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.plot(xR, yR, label="궤도")
+    ax.scatter(0, 0, s=200, color="yellow", label="태양")
+
+    # Earth
+    ax.scatter(xE_R, yE_R, color="blue", s=100, label="지구")
+
+    # 자전축 (2D)
+    L = 0.3
+    dx = L * math.sin(eps)
+    dy = L * math.cos(eps)
+    ax.plot([xE_R - dx / 2, xE_R + dx / 2], [yE_R - dy / 2, yE_R + dy / 2], color="black", linewidth=2)
+
+    ax.set_aspect("equal")
+    R = 1 + e + 0.5
+    ax.set_xlim(-R, R)
+    ax.set_ylim(-R, R)
+    ax.grid()
+    ax.legend()
+    ax.set_title("지구 공전 궤도")
+    return fig
+
+
+# ============================================
+# STREAMLIT APP (학생용 UI)
+# ============================================
+st.set_page_config(layout="wide")
+st.title("🌍 고등학생용 지구 공전·일사량 시뮬레이터")
+st.caption(
+    "달력 날짜와 공전 매개변수를 조정하며 일사량 변화를 한눈에 확인하세요. "
+    "왼쪽 사이드바에서 값을 바꾼 뒤, 아래 애니메이션으로 흐름을 살펴볼 수 있습니다."
+)
+
+# --- session_state ---
+if "animate" not in st.session_state:
+    st.session_state.animate = False
+if "N" not in st.session_state:
+    st.session_state.N = 80
+
+# --------------------------------------------
+# 입력 UI
+# --------------------------------------------
+with st.sidebar:
+    st.header("입력값")
+
+    month = int(st.number_input("월", 1, 12, 3))
+    max_day_for_month = DAYS_IN_MONTH[month - 1]
+    day = int(st.number_input("일", 1, max_day_for_month, min(21, max_day_for_month)))
+
+    st.caption(f"현재 달에서 계산되는 최대 날짜는 {max_day_for_month}일입니다.")
+
+    st.subheader("공전 매개변수")
+    e = st.slider("이심률 e", 0.0, 0.1, 0.0167, 0.0001)
+    omega_deg = st.slider("세차(ω)", 0.0, 360.0, 102.0)
+    epsilon_deg = st.slider("축 경사(ε)", 0.0, 40.0, 23.4)
+
+    st.subheader("위치·시간")
+    phi_deg = st.slider("위도", -90.0, 90.0, 37.0)
+    N_slider = st.slider("날짜(N일차)", 0, 364, st.session_state.N)
+
+    st.divider()
+    anim_speed = st.slider("애니메이션 속도 (ms)", 1, 250, 30, 1)
+
+# --------------------------------------------
+# 레이아웃
+# --------------------------------------------
+colL, colR = st.columns([1.15, 1])
+
+with colL:
+    if not st.session_state.animate:
+        st.session_state.N = N_slider
+
+    N = st.session_state.N
+    N_from_date = min(day_of_year(month, day), 364)
+
+    M = mean_anomaly(N)
+    E_val = eccentric_anomaly(M, e)
+    v = true_anomaly(E_val, e)
+    delta, lam = solar_declination(v, omega_deg, epsilon_deg)
+
+    fig_orbit = draw_orbit(e, omega_deg, E_val, epsilon_deg)
+    st.pyplot(fig_orbit, width="stretch")
+
+with colR:
+    st.subheader("🌞 선택 날짜와 태양 위치")
+    top_stats = st.columns(3)
+    top_stats[0].metric("달력 기준 N", f"{N_from_date}")
+    top_stats[1].metric("슬라이더 N", f"{N}")
+    top_stats[2].metric("태양 적위", f"{math.degrees(delta):.2f}°")
+
+    st.markdown(f"**입력한 날짜:** {month}월 {day}일 · **위도:** {phi_deg:.1f}°")
+    phi_rad = math.radians(phi_deg)
+    alpha_noon = solar_noon_altitude(phi_rad, delta)
+
+    st.subheader("📈 위도별 하루 태양 에너지량")
+    phi_list = np.linspace(-90, 90, 181)
+    phi_rad_all = np.radians(phi_list)
+    Q = daily_insolation(phi_rad_all, delta, e, lam, omega_deg)
+
+    figQ, axQ = plt.subplots(figsize=(6, 4))
+    axQ.plot(phi_list, Q, color="#1f77b4", linewidth=2.2)
+    axQ.fill_between(phi_list, Q, color="#1f77b4", alpha=0.08)
+    axQ.axvline(phi_deg, color="crimson", linestyle="--", linewidth=1.5, label="선택 위도")
+    axQ.legend()
+    axQ.set_xlabel("위도 (deg)")
+    axQ.set_ylabel("태양 에너지량 (W/m²)")
+    axQ.spines["top"].set_visible(False)
+    axQ.spines["right"].set_visible(False)
+    axQ.grid(alpha=0.3)
+    st.pyplot(figQ, width="stretch")
+
+    st.subheader("🌅 남중고도")
+    st.metric("정오 고도", f"{alpha_noon:.2f}°")
+
+    st.divider()
+    st.markdown(
+        """
+        - 달력 N과 슬라이더 N을 분리해 비교할 수 있도록 상단에 배치했습니다.
+        - 그래프에 면적 음영과 범례를 추가해 위도 변화에 따른 일사량의 흐름을 쉽게 읽을 수 있습니다.
+        - 핵심 수치를 상단 카드 형태로 정리해 한눈에 현재 상태를 파악할 수 있습니다.
+        """
+    )
+
+# --------------------------------------------
+# 애니메이션 컨트롤
+# --------------------------------------------
+st.subheader("⏯ 날짜 자동 변화 애니메이션")
+
+c1, c2, c3 = st.columns(3)
+if c1.button("▶ Start"):
+    st.session_state.animate = True
+if c2.button("⏸ Pause"):
+    st.session_state.animate = False
+if c3.button("↺ 월·일과 동기화"):
+    st.session_state.N = N_from_date
+
+if st.session_state.animate:
+    st.session_state.N = (st.session_state.N + 1) % 365
+    time.sleep(anim_speed / 1000.0)
+    st.experimental_rerun()
