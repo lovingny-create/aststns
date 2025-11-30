@@ -19,6 +19,14 @@ from matplotlib import font_manager
 DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
+def trigger_rerun():
+    """Use Streamlit's stable rerun API with a safe fallback for older versions."""
+    if hasattr(st, "rerun"):
+        st.rerun()
+    else:  # pragma: no cover - legacy Streamlit
+        st.experimental_rerun()
+
+
 def ensure_korean_font():
     """matplotlib에서 한글이 깨지지 않도록 강제로 설정."""
     font_path = "/tmp/NanumGothic.ttf"
@@ -208,25 +216,25 @@ with st.sidebar:
         st.session_state.month = 3
         st.session_state.day = 20
         st.session_state.animate = False
-        st.experimental_rerun()
+        trigger_rerun()
 
     if cB.button("하지"):
         st.session_state.month = 6
         st.session_state.day = 21
         st.session_state.animate = False
-        st.experimental_rerun()
+        trigger_rerun()
 
     if cC.button("추분"):
         st.session_state.month = 9
         st.session_state.day = 22
         st.session_state.animate = False
-        st.experimental_rerun()
+        trigger_rerun()
 
     if cD.button("동지"):
         st.session_state.month = 12
         st.session_state.day = 21
         st.session_state.animate = False
-        st.experimental_rerun()
+        trigger_rerun()
 
     st.subheader("공전 매개변수")
     e = st.slider("이심률 e", 0.0, 0.1, 0.0167, 0.0001)
@@ -304,4 +312,4 @@ if c3.button("↺ 1월 1일"):
 if st.session_state.animate:
     st.session_state.N = (st.session_state.N + 1) % 365
     time.sleep(anim_speed / 1000.0)
-    st.experimental_rerun()
+    trigger_rerun()
