@@ -145,6 +145,7 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     a = 1.0
     b = a * math.sqrt(1 - e_vis * e_vis)
     eps = math.radians(epsilon_deg)
+    omega_rad = math.radians(omega_deg)
     view_tilt = math.radians(15)  # 공전면을 약간 위에서 내려다보기
 
     E_all = np.linspace(0, 2 * np.pi, 500)
@@ -172,8 +173,12 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
 
     # 자전축
     L = 0.35
-    dx = L * math.sin(eps)
-    dy = L * math.cos(eps) * math.cos(view_tilt)
+    dx_base = L * math.sin(eps)
+    dy_base = L * math.cos(eps) * math.cos(view_tilt)
+
+    # 세차 각도에 따라 자전축 방향도 함께 회전 (반시계 증가)
+    dx = dx_base * math.cos(omega_rad) - dy_base * math.sin(omega_rad)
+    dy = dx_base * math.sin(omega_rad) + dy_base * math.cos(omega_rad)
     ax.plot(
         [xE_R - dx / 2, xE_R + dx / 2],
         [yE_R - dy / 2, yE_R + dy / 2],
