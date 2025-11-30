@@ -215,6 +215,10 @@ if "animate" not in st.session_state:
     st.session_state.animate = False
 if "N" not in st.session_state:
     st.session_state.N = 80
+if "month" not in st.session_state:
+    st.session_state.month = 3
+if "day" not in st.session_state:
+    st.session_state.day = 21
 
 # --------------------------------------------
 # 입력 UI
@@ -223,24 +227,23 @@ with st.sidebar:
     st.header("입력값")
 
     st.subheader("날짜 선택")
-    date_mode = st.radio("날짜 입력 방식", ("월·일로 입력", "N일차 슬라이더"), index=0)
+    if st.session_state.animate:
+        # 애니메이션 중이면 현재 N값에서 월/일을 갱신해 표시한다.
+        anim_month, anim_day = month_day_from_day_of_year(st.session_state.N)
+        st.session_state.month = anim_month
+        st.session_state.day = anim_day
 
-    if date_mode == "월·일로 입력":
-        month = int(st.number_input("월", 1, 12, 3))
-        max_day_for_month = DAYS_IN_MONTH[month - 1]
-        day = int(
-            st.number_input(
-                "일", 1, max_day_for_month, min(21, max_day_for_month)
-            )
+    month = int(st.number_input("월", 1, 12, st.session_state.month))
+    max_day_for_month = DAYS_IN_MONTH[month - 1]
+    day = int(
+        st.number_input(
+            "일", 1, max_day_for_month, min(st.session_state.day, max_day_for_month)
         )
+    )
+    st.session_state.month = month
+    st.session_state.day = day
 
-        st.caption(f"현재 달에서 계산되는 최대 날짜는 {max_day_for_month}일입니다.")
-        N_from_date = min(day_of_year(month, day), 364)
-        N_slider = None
-    else:
-        month, day = None, None
-        N_slider = st.slider("날짜(N일차)", 0, 364, st.session_state.N)
-        N_from_date = None
+    st.caption(f"현재 달에서 계산되는 최대 날짜는 {max_day_for_month}일입니다.")
 
     st.subheader("공전 매개변수")
     e = st.slider("이심률 e", 0.0, 0.1, 0.0167, 0.0001)
@@ -253,22 +256,16 @@ with st.sidebar:
     st.divider()
     anim_speed = st.slider("애니메이션 속도 (ms)", 1, 250, 30, 1)
 
-if date_mode == "월·일로 입력" and st.session_state.animate:
-    st.session_state.animate = False
-
 # --------------------------------------------
 # 레이아웃
 # --------------------------------------------
 colL, colR = st.columns([1.15, 1])
 
 with colL:
-    if not st.session_state.animate and date_mode == "N일차 슬라이더" and N_slider is not None:
-        st.session_state.N = N_slider
+    if not st.session_state.animate:
+        st.session_state.N = min(day_of_year(month, day), 364)
 
-    if date_mode == "월·일로 입력":
-        active_N = N_from_date
-    else:
-        active_N = st.session_state.N
+    active_N = st.session_state.N
 
     M = mean_anomaly(active_N)
     E_val = eccentric_anomaly(M, e)
@@ -280,13 +277,7 @@ with colL:
 
 with colR:
     st.subheader("🌞 선택 날짜와 태양 위치")
-    if date_mode == "월·일로 입력":
-        st.markdown(f"**입력한 날짜:** {month}월 {day}일")
-    else:
-        derived_month, derived_day = month_day_from_day_of_year(active_N)
-        st.markdown(
-            f"**슬라이더 N일차:** {active_N}일차 · **달력 환산:** {derived_month}월 {derived_day}일"
-        )
+    st.markdown(f"**입력한 날짜:** {month}월 {day}일")
 
     st.markdown(
         f"**위도:** {phi_deg:.1f}° · **태양 적위:** {math.degrees(delta):.2f}°"
@@ -326,19 +317,14 @@ with colR:
 # --------------------------------------------
 st.subheader("⏯ 날짜 자동 변화 애니메이션")
 
-if date_mode == "월·일로 입력":
-    st.info("월·일 입력 모드에서는 N일차가 자동 계산됩니다. 슬라이더 모드에서 애니메이션을 사용할 수 있습니다.")
-    c1, c2 = st.columns(2)
-    c1.button("▶ Start", disabled=True)
-    c2.button("⏸ Pause", disabled=True)
-else:
-    c1, c2, c3 = st.columns(3)
-    if c1.button("▶ Start"):
-        st.session_state.animate = True
-    if c2.button("⏸ Pause"):
-        st.session_state.animate = False
-    if c3.button("↺ 0일차로 리셋"):
-        st.session_state.N = 0
+c1, c2, c3 = st.columns(3)
+if c1.button("▶ Start"):
+    st.session_state.animate = True
+if c2.button("⏸ Pause"):
+    st.session_state.animate = False
+if c3.button("↺ 1월 1일로 리셋"):
+    st.session_state.N = 0
+    st.session_state.month, st.session_state.day = 1, 1
 
 if st.session_state.animate:
     st.session_state.N = (st.session_state.N + 1) % 365
