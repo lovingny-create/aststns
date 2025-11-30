@@ -133,12 +133,12 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
 
     E_all = np.linspace(0, 2 * np.pi, 500)
     x = -a * (np.cos(E_all) - e_vis)
-    y = b * np.sin(E_all) * math.cos(view_tilt)
+    y = -b * np.sin(E_all) * math.cos(view_tilt)
 
     xR, yR = x, y
 
     xE = -a * (math.cos(E_now) - e_vis)
-    yE = b * math.sin(E_now) * math.cos(view_tilt)
+    yE = -b * math.sin(E_now) * math.cos(view_tilt)
     xE_R, yE_R = xE, yE
 
     peri_x, peri_y = -a * (1 - e_vis), 0
@@ -200,14 +200,6 @@ if "month" not in st.session_state:
     st.session_state.month = 3
 if "day" not in st.session_state:
     st.session_state.day = 21
-if "e" not in st.session_state:
-    st.session_state.e = 0.0167
-if "omega_deg" not in st.session_state:
-    st.session_state.omega_deg = 102.9372
-if "epsilon_deg" not in st.session_state:
-    st.session_state.epsilon_deg = 23.44
-if "phi_deg" not in st.session_state:
-    st.session_state.phi_deg = 37.0
 if "anim_speed" not in st.session_state:
     st.session_state.anim_speed = 30
 
@@ -216,6 +208,19 @@ if "anim_speed" not in st.session_state:
 # --------------------------------------------
 with st.sidebar:
     st.header("입력값")
+
+    st.markdown(
+        """
+        <style>
+        .stButton>button {
+            white-space: nowrap;
+            font-size: 14px;
+            padding: 0.35rem 0.75rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.subheader("날짜 선택")
 
@@ -240,9 +245,6 @@ with st.sidebar:
 
     st.session_state.month = month
     st.session_state.day = day
-
-    # 📌 절기 바로가기 버튼
-    st.subheader("📌 절기 바로가기")
 
     cA, cB, cC, cD = st.columns(4)
 
@@ -270,17 +272,13 @@ with st.sidebar:
         st.session_state.animate = False
         trigger_rerun()
 
-    st.subheader("공전 매개변수")
-    e = st.slider("이심률 e", 0.0, 0.1, st.session_state.e, 0.0001, key="e")
-    omega_deg = st.slider(
-        "세차(ω)", 0.0, 360.0, st.session_state.omega_deg, key="omega_deg"
-    )
-    epsilon_deg = st.slider(
-        "축 경사(ε)", 0.0, 40.0, st.session_state.epsilon_deg, key="epsilon_deg"
-    )
+    st.subheader("밀란코비치 변수")
+    e = st.slider("이심률 e", 0.0, 0.1, 0.0167, 0.0001, key="e")
+    omega_deg = st.slider("세차(ω)", 0.0, 360.0, 102.9372, key="omega_deg")
+    epsilon_deg = st.slider("축 경사(ε)", 0.0, 40.0, 23.44, key="epsilon_deg")
 
     st.subheader("관측자 위도")
-    phi_deg = st.slider("위도", -90.0, 90.0, st.session_state.phi_deg, key="phi_deg")
+    phi_deg = st.slider("위도", -90.0, 90.0, 37.0, key="phi_deg")
 
 # --------------------------------------------
 # 메인 패널
@@ -317,29 +315,48 @@ if minutes == 60:
 
 info_table_html = f"""
 <style>
-.info-table {{width: 100%; border-collapse: collapse; font-size: 15px;}}
-.info-table td {{padding: 8px 10px; border-bottom: 1px solid #e0e0e0;}}
-.info-label {{color: #4b5563; font-weight: 600; white-space: nowrap;}}
-.info-value {{color: #111827; font-weight: 700; text-align: right;}}
+.info-table {{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  table-layout: fixed;
+}}
+.info-table th {{
+  background: #f3f4f6;
+  color: #111827;
+  padding: 8px 10px;
+  font-weight: 800;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}}
+.info-table td {{
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #111827;
+  font-weight: 700;
+  text-align: left;
+}}
+.info-table td.value {{ text-align: right; color: #0f172a; }}
 </style>
 <table class="info-table">
-  <tr><td class="info-label">입력 날짜</td><td class="info-value">{st.session_state.month}월 {st.session_state.day}일</td></tr>
-  <tr><td class="info-label">태양 적위</td><td class="info-value">{math.degrees(delta):.2f}°</td></tr>
-  <tr><td class="info-label">위도</td><td class="info-value">{phi_deg:.1f}°</td></tr>
+  <tr>
+    <th>항목</th>
+    <th>값</th>
+  </tr>
+  <tr><td>입력 날짜</td><td class="value">{st.session_state.month}월 {st.session_state.day}일</td></tr>
+  <tr><td>위도</td><td class="value">{phi_deg:.1f}°</td></tr>
+  <tr><td>태양 적위</td><td class="value">{math.degrees(delta):.2f}°</td></tr>
+  <tr><td>정오 고도</td><td class="value">{alpha_noon:.2f}°</td></tr>
+  <tr><td>일사량</td><td class="value">{Q_at_lat:.0f} W/m²</td></tr>
+  <tr><td>낮 길이</td><td class="value">{hours}시간 {minutes:02d}분</td></tr>
 </table>
 """
 
-col_info, col_chart = st.columns([0.95, 1.05])
+st.subheader("🛰️ 지구 공전 궤도")
+fig_orbit = draw_orbit(e, omega_deg, E_val, epsilon_deg)
+st.pyplot(fig_orbit)
 
-with col_info:
-    st.subheader("🌞 현재 태양 위치 정보")
-    st.markdown(info_table_html, unsafe_allow_html=True)
-
-    st.subheader("🌅 남중고도 · 일사량 · 낮 길이")
-    c_alt, c_q, c_daylen = st.columns(3)
-    c_alt.metric("정오 고도", f"{alpha_noon:.2f}°")
-    c_q.metric("일사량", f"{Q_at_lat:.0f} W/m²")
-    c_daylen.metric("낮 길이", f"{hours}시간 {minutes:02d}분")
+col_chart, col_info = st.columns([1.05, 0.95])
 
 with col_chart:
     st.subheader("📈 위도별 하루 태양 에너지량 (W/m²)")
@@ -353,9 +370,9 @@ with col_chart:
     figQ.tight_layout(pad=0.5)
     st.pyplot(figQ)
 
-st.subheader("🛰️ 지구 공전 궤도")
-fig_orbit = draw_orbit(e, omega_deg, E_val, epsilon_deg)
-st.pyplot(fig_orbit)
+with col_info:
+    st.subheader("🌞 현재 태양 위치 정보")
+    st.markdown(info_table_html, unsafe_allow_html=True)
 
 
 # --------------------------------------------
