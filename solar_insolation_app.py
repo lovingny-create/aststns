@@ -315,23 +315,19 @@ if minutes == 60:
     hours += 1
     minutes = 0
 
-info_table_html = """
+info_table_html = f"""
 <style>
-.info-table {width: 100%; border-collapse: collapse; font-size: 15px;}
-.info-table td {padding: 8px 10px; border-bottom: 1px solid #e0e0e0;}
-.info-label {color: #4b5563; font-weight: 600; white-space: nowrap;}
-.info-value {color: #111827; font-weight: 700; text-align: right;}
+.info-table {{width: 100%; border-collapse: collapse; font-size: 15px;}}
+.info-table td {{padding: 8px 10px; border-bottom: 1px solid #e0e0e0;}}
+.info-label {{color: #4b5563; font-weight: 600; white-space: nowrap;}}
+.info-value {{color: #111827; font-weight: 700; text-align: right;}}
 </style>
 <table class="info-table">
-  <tr><td class="info-label">입력 날짜</td><td class="info-value">{date_text}</td></tr>
-  <tr><td class="info-label">태양 적위</td><td class="info-value">{decl_text}</td></tr>
-  <tr><td class="info-label">위도</td><td class="info-value">{lat_text}</td></tr>
+  <tr><td class="info-label">입력 날짜</td><td class="info-value">{st.session_state.month}월 {st.session_state.day}일</td></tr>
+  <tr><td class="info-label">태양 적위</td><td class="info-value">{math.degrees(delta):.2f}°</td></tr>
+  <tr><td class="info-label">위도</td><td class="info-value">{phi_deg:.1f}°</td></tr>
 </table>
-""".format(
-    date_text=f"{st.session_state.month}월 {st.session_state.day}일",
-    decl_text=f"{math.degrees(delta):.2f}°",
-    lat_text=f"{phi_deg:.1f}°",
-)
+"""
 
 col_info, col_chart = st.columns([0.95, 1.05])
 
