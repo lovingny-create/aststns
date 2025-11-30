@@ -264,7 +264,8 @@ st.markdown(
 INIT_MONTH = 3
 INIT_DAY = 21
 INIT_E = 0.0167
-INIT_OMEGA = 102.9372
+INIT_PRECESSION_YEAR = 0
+INIT_OMEGA = (INIT_PRECESSION_YEAR / 26000) * 360
 INIT_EPS = 23.44
 INIT_PHI = 37.0
 INIT_N = day_of_year(INIT_MONTH, INIT_DAY)
@@ -284,6 +285,8 @@ if "phi_deg" not in st.session_state:
     st.session_state.phi_deg = INIT_PHI
 if "e" not in st.session_state:
     st.session_state.e = INIT_E
+if "precession_year" not in st.session_state:
+    st.session_state.precession_year = INIT_PRECESSION_YEAR
 if "omega_deg" not in st.session_state:
     st.session_state.omega_deg = INIT_OMEGA
 if "epsilon_deg" not in st.session_state:
@@ -297,6 +300,7 @@ def reset_state():
     st.session_state.N = INIT_N
     st.session_state.animate = False
     st.session_state.e = INIT_E
+    st.session_state.precession_year = INIT_PRECESSION_YEAR
     st.session_state.omega_deg = INIT_OMEGA
     st.session_state.epsilon_deg = INIT_EPS
     st.session_state.phi_deg = INIT_PHI
@@ -375,7 +379,19 @@ with st.sidebar:
 
     st.subheader("밀란코비치 변수")
     e = st.slider("이심률 e", 0.0, 0.1, 0.0167, 0.0001, key="e")
-    omega_deg = st.slider("세차(ω)", 0.0, 360.0, 102.9372, key="omega_deg")
+    precession_year = st.slider(
+        "세차 단계 (년)",
+        0,
+        26000,
+        st.session_state.precession_year,
+        key="precession_year",
+        help=(
+            "지구 세차운동은 약 26000년 주기로 반시계 방향으로 진행하며,\n"
+            "계절의 위치(근일점/원일점과의 상대 위치)가 서서히 변합니다."
+        ),
+    )
+    omega_deg = (precession_year / 26000) * 360
+    st.session_state.omega_deg = omega_deg
     epsilon_deg = st.slider("축 경사(ε)", 0.0, 40.0, 23.44, key="epsilon_deg")
 
     st.subheader("애니메이션 속도")
