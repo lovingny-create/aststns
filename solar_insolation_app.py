@@ -244,7 +244,7 @@ def draw_sun_path(phi_deg: float, delta: float, epsilon_deg: float):
 # ============================================
 # STREAMLIT APP (학생용)
 # ============================================
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 ensure_korean_font()
 
 st.title("밀란코비치 주기에 따른 기후 변화")
@@ -255,6 +255,9 @@ st.markdown(
     <style>
     .block-container { padding-top: 1.0rem; padding-bottom: 1.3rem; }
     h1 { margin-bottom: 0.4rem; }
+    /* Hide the unused sidebar so controls do not render twice on narrow screens */
+    [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
+    body { background-color: white; }
     </style>
     """,
     unsafe_allow_html=True,
