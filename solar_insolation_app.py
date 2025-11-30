@@ -1,10 +1,12 @@
 """Streamlit app to explore Earth's orbit and daily insolation by latitude."""
+
 import math
-import tempfile
 import time
 import urllib.request
 from pathlib import Path
 from typing import Tuple
+import tempfile
+import os
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,32 +14,45 @@ import streamlit as st
 from matplotlib import font_manager
 
 # ============================================
-# 0. 날짜 → N일차
+# 0. 날짜 처리
 # ============================================
 DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
+def ensure_korean_font():
+    """matplotlib에서 한글이 깨지지 않도록 강제로 설정."""
+    font_path = "/tmp/NanumGothic.ttf"
+    url = (
+        "https://github.com/google/fonts/raw/main/ofl/"
+        "nanumgothic/NanumGothic-Regular.ttf"
+    )
+
+    if not os.path.exists(font_path):
+        urllib.request.urlretrieve(url, font_path)
+
+    font_manager.fontManager.addfont(font_path)
+    plt.rcParams["font.family"] = "NanumGothic"
+    plt.rcParams["axes.unicode_minus"] = False
+
+
 def day_of_year(month: int, day: int) -> int:
-    """Return zero-based day of year for the provided month/day."""
     safe_day = min(day, DAYS_IN_MONTH[month - 1])
     return sum(DAYS_IN_MONTH[: month - 1]) + safe_day - 1  # 0-based
 
 
 def month_day_from_day_of_year(N: int) -> Tuple[int, int]:
-    """Convert zero-based day-of-year to (month, day)."""
-
-    remaining = N + 1  # convert to 1-based count for division into months
+    """Zero-based N → (month, day)"""
+    remaining = N + 1  # convert to 1-based day
     for month_idx, days_in_month in enumerate(DAYS_IN_MONTH, start=1):
         if remaining > days_in_month:
             remaining -= days_in_month
         else:
             return month_idx, remaining
-    # fallback: last day of the year
     return 12, 31
 
 
 # ============================================
-# 1. Mean anomaly
+# 1. Orbital mechanics
 # ============================================
 def mean_anomaly(N: int, M0_deg: float = -3.0) -> float:
     deg_per_day = 360.0 / 365.25
@@ -45,9 +60,6 @@ def mean_anomaly(N: int, M0_deg: float = -3.0) -> float:
     return math.radians(M_deg)
 
 
-# ============================================
-# 2. Eccentric anomaly
-# ============================================
 def eccentric_anomaly(M: float, e: float, n_iter: int = 6) -> float:
     E = M
     for _ in range(n_iter):
@@ -57,68 +69,23 @@ def eccentric_anomaly(M: float, e: float, n_iter: int = 6) -> float:
     return E
 
 
-# ============================================
-# 3. True anomaly
-# ============================================
 def true_anomaly(E: float, e: float) -> float:
     num = math.sqrt(1 + e) * math.sin(E / 2)
     den = math.sqrt(1 - e) * math.cos(E / 2)
-    v = 2 * math.atan2(num, den)
-    return v
+    return 2 * math.atan2(num, den)
 
 
-# ============================================
-# 4. Declination (태양 적위)
-# ============================================
 def solar_declination(v: float, omega_deg: float, epsilon_deg: float) -> Tuple[float, float]:
-    # 지구의 진근점 기준 경도 v에 근일점 경도(omega)를 더한 뒤 태양-지구 시차 180°를
-    # 반영해 실제 태양 황경(lam)을 얻는다. 이렇게 하면 북반구 하지가 원일점,
-    # 동지가 근일점에 일치한다.
-    lam = v + math.radians(omega_deg) + math.pi
+    lam = v + math.radians(omega_deg) + math.pi  # Earth-Sun phase shift
     eps = math.radians(epsilon_deg)
     delta = math.asin(math.sin(eps) * math.sin(lam))
     return delta, lam
 
 
 # ============================================
-# 5. 위도별 일사량
+# 2. Insolation
 # ============================================
-S0 = 1361  # solar constant
-
-
-def ensure_korean_font() -> None:
-    """Ensure matplotlib uses a font that can render Korean labels."""
-
-    preferred_fonts = [
-        "NanumGothic",
-        "Noto Sans CJK KR",
-        "Malgun Gothic",
-        "AppleGothic",
-    ]
-
-    for font_name in preferred_fonts:
-        try:
-            font_manager.findfont(font_name, fallback_to_default=False)
-        except Exception:
-            continue
-        else:
-            plt.rcParams["font.family"] = font_name
-            break
-    else:
-        font_url = (
-            "https://github.com/google/fonts/raw/main/ofl/"
-            "nanumgothic/NanumGothic-Regular.ttf"
-        )
-        cache_path = Path(tempfile.gettempdir()) / "NanumGothic-Regular.ttf"
-        try:
-            if not cache_path.exists():
-                urllib.request.urlretrieve(font_url, cache_path)
-            font_manager.fontManager.addfont(cache_path)
-            plt.rcParams["font.family"] = "NanumGothic"
-        except Exception:
-            plt.rcParams["font.family"] = "DejaVu Sans"
-
-    plt.rcParams["axes.unicode_minus"] = False
+S0 = 1361
 
 
 def daily_insolation(phi_rad: np.ndarray, delta: float, e: float, lam: float, omega_deg: float) -> np.ndarray:
@@ -128,32 +95,28 @@ def daily_insolation(phi_rad: np.ndarray, delta: float, e: float, lam: float, om
     cosH0 = np.clip(cosH0, -1, 1)
     H0 = np.arccos(cosH0)
 
-    Q = (S0 / math.pi) * rfac * (
+    return (S0 / math.pi) * rfac * (
         H0 * np.sin(phi_rad) * np.sin(delta)
         + np.cos(phi_rad) * np.cos(delta) * np.sin(H0)
     )
-    return Q
 
 
-# ============================================
-# 6. 남중고도
-# ============================================
 def solar_noon_altitude(phi_rad: float, delta: float) -> float:
-    alpha = math.degrees(
+    return math.degrees(
         math.asin(
-            math.sin(phi_rad) * math.sin(delta)
-            + math.cos(phi_rad) * math.cos(delta)
+            math.sin(phi_rad) * math.sin(delta) +
+            math.cos(phi_rad) * math.cos(delta)
         )
     )
-    return alpha
 
 
 # ============================================
-# 7. 궤도 그림
+# 3. Orbit visualization
 # ============================================
 def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
-    # 궤도 시각화에서만 이심률을 과장해 학생들이 타원 형태를 더 쉽게 구분하도록 한다.
-    e_vis = min(e * 10, 0.9)  # 시각화용 이심률 (계산은 실제 e 사용)
+
+    # 시각적으로 보기 좋게 이심률 강조
+    e_vis = min(e * 10, 0.9)
 
     a = 1.0
     b = a * math.sqrt(1 - e_vis * e_vis)
@@ -164,53 +127,48 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     x = a * (np.cos(E_all) - e_vis)
     y = b * np.sin(E_all)
 
-    # 회전
     xR = x * np.cos(omega) - y * np.sin(omega)
     yR = x * np.sin(omega) + y * np.cos(omega)
 
-    # 현재 지구 위치
     xE = a * (math.cos(E_now) - e_vis)
     yE = b * math.sin(E_now)
     xE_R = xE * np.cos(omega) - yE * np.sin(omega)
     yE_R = xE * np.sin(omega) + yE * np.cos(omega)
 
     fig, ax = plt.subplots(figsize=(6, 6))
-    ax.plot(xR, yR, label="궤도")
+    ax.plot(xR, yR)
     ax.scatter(0, 0, s=200, color="yellow", label="태양")
+    ax.scatter(xE_R, yE_R, s=100, color="blue", label="지구")
 
-    # Earth
-    ax.scatter(xE_R, yE_R, color="blue", s=100, label="지구")
-
-    # 자전축 (2D)
+    # 자전축
     L = 0.3
     dx = L * math.sin(eps)
     dy = L * math.cos(eps)
-    ax.plot([xE_R - dx / 2, xE_R + dx / 2], [yE_R - dy / 2, yE_R + dy / 2], color="black", linewidth=2)
+    ax.plot(
+        [xE_R - dx / 2, xE_R + dx / 2],
+        [yE_R - dy / 2, yE_R + dy / 2],
+        color="black",
+        linewidth=2,
+    )
 
     ax.set_aspect("equal")
-    R = 1 + e + 0.5
+    R = 1 + e_vis + 0.5
     ax.set_xlim(-R, R)
     ax.set_ylim(-R, R)
+    ax.set_title("지구 공전 궤도")
     ax.grid()
-    ax.legend()
-    ax.set_title(
-        f"지구 공전 궤도 (시각화용 e={e_vis:.3f}, 실제 e={e:.4f})"
-    )
+
     return fig
 
 
 # ============================================
-# STREAMLIT APP (학생용 UI)
+# STREAMLIT APP (학생용)
 # ============================================
 st.set_page_config(layout="wide")
-st.title("🌍 고등학생용 지구 공전·일사량 시뮬레이터")
 ensure_korean_font()
-st.caption(
-    "달력 날짜와 공전 매개변수를 조정하며 일사량 변화를 한눈에 확인하세요. "
-    "왼쪽 사이드바에서 값을 바꾼 뒤, 아래 애니메이션으로 흐름을 살펴볼 수 있습니다."
-)
 
-# --- session_state ---
+st.title("🌍 고등학생용 지구 공전·일사량 시뮬레이터")
+
 if "animate" not in st.session_state:
     st.session_state.animate = False
 if "N" not in st.session_state:
@@ -227,45 +185,72 @@ with st.sidebar:
     st.header("입력값")
 
     st.subheader("날짜 선택")
+
+    # 애니메이션 중에는 month/day 자동 갱신
     if st.session_state.animate:
-        # 애니메이션 중이면 현재 N값에서 월/일을 갱신해 표시한다.
-        anim_month, anim_day = month_day_from_day_of_year(st.session_state.N)
-        st.session_state.month = anim_month
-        st.session_state.day = anim_day
+        m, d = month_day_from_day_of_year(st.session_state.N)
+        st.session_state.month = m
+        st.session_state.day = d
 
     month = int(st.number_input("월", 1, 12, st.session_state.month))
-    max_day_for_month = DAYS_IN_MONTH[month - 1]
-    day = int(
-        st.number_input(
-            "일", 1, max_day_for_month, min(st.session_state.day, max_day_for_month)
-        )
-    )
+    max_day = DAYS_IN_MONTH[month - 1]
+    day = int(st.number_input("일", 1, max_day, min(st.session_state.day, max_day)))
+
     st.session_state.month = month
     st.session_state.day = day
 
-    st.caption(f"현재 달에서 계산되는 최대 날짜는 {max_day_for_month}일입니다.")
+    # 📌 절기 바로가기 버튼
+    st.subheader("📌 절기 바로가기")
+
+    cA, cB, cC, cD = st.columns(4)
+
+    if cA.button("춘분"):
+        st.session_state.month = 3
+        st.session_state.day = 20
+        st.session_state.animate = False
+        st.experimental_rerun()
+
+    if cB.button("하지"):
+        st.session_state.month = 6
+        st.session_state.day = 21
+        st.session_state.animate = False
+        st.experimental_rerun()
+
+    if cC.button("추분"):
+        st.session_state.month = 9
+        st.session_state.day = 22
+        st.session_state.animate = False
+        st.experimental_rerun()
+
+    if cD.button("동지"):
+        st.session_state.month = 12
+        st.session_state.day = 21
+        st.session_state.animate = False
+        st.experimental_rerun()
 
     st.subheader("공전 매개변수")
     e = st.slider("이심률 e", 0.0, 0.1, 0.0167, 0.0001)
     omega_deg = st.slider("세차(ω)", 0.0, 360.0, 102.0)
     epsilon_deg = st.slider("축 경사(ε)", 0.0, 40.0, 23.4)
 
-    st.subheader("위치·시간")
+    st.subheader("관측자 위도")
     phi_deg = st.slider("위도", -90.0, 90.0, 37.0)
 
     st.divider()
-    anim_speed = st.slider("애니메이션 속도 (ms)", 1, 250, 30, 1)
+    anim_speed = st.slider("애니메이션 속도(ms)", 1, 200, 30)
 
 # --------------------------------------------
-# 레이아웃
+# 메인 패널
 # --------------------------------------------
 colL, colR = st.columns([1.15, 1])
 
 with colL:
-    if not st.session_state.animate:
-        st.session_state.N = min(day_of_year(month, day), 364)
-
-    active_N = st.session_state.N
+    # 날짜 → N 변환
+    active_N = (
+        day_of_year(st.session_state.month, st.session_state.day)
+        if not st.session_state.animate
+        else st.session_state.N
+    )
 
     M = mean_anomaly(active_N)
     E_val = eccentric_anomaly(M, e)
@@ -273,58 +258,48 @@ with colL:
     delta, lam = solar_declination(v, omega_deg, epsilon_deg)
 
     fig_orbit = draw_orbit(e, omega_deg, E_val, epsilon_deg)
-    st.pyplot(fig_orbit, width="stretch")
+    st.pyplot(fig_orbit)
 
 with colR:
-    st.subheader("🌞 선택 날짜와 태양 위치")
-    st.markdown(f"**입력한 날짜:** {month}월 {day}일")
+    st.subheader("🌞 현재 태양 위치 정보")
 
-    st.markdown(
-        f"**위도:** {phi_deg:.1f}° · **태양 적위:** {math.degrees(delta):.2f}°"
-    )
-    phi_rad = math.radians(phi_deg)
-    alpha_noon = solar_noon_altitude(phi_rad, delta)
+    st.markdown(f"**입력 날짜:** {st.session_state.month}월 {st.session_state.day}일")
+    st.markdown(f"**태양 적위:** {math.degrees(delta):.2f}°")
+    st.markdown(f"**위도:** {phi_deg}°")
 
-    st.subheader("📈 위도별 하루 태양 에너지량")
+    # 일사량
+    st.subheader("📈 위도별 하루 태양 에너지량 (W/m²)")
     phi_list = np.linspace(-90, 90, 181)
     phi_rad_all = np.radians(phi_list)
     Q = daily_insolation(phi_rad_all, delta, e, lam, omega_deg)
 
     figQ, axQ = plt.subplots(figsize=(6, 4))
-    axQ.plot(phi_list, Q, color="#1f77b4", linewidth=2.2)
-    axQ.fill_between(phi_list, Q, color="#1f77b4", alpha=0.08)
-    axQ.axvline(phi_deg, color="crimson", linestyle="--", linewidth=1.5, label="선택 위도")
-    axQ.legend()
-    axQ.set_xlabel("위도 (deg)")
-    axQ.set_ylabel("태양 에너지량 (W/m²)")
-    axQ.spines["top"].set_visible(False)
-    axQ.spines["right"].set_visible(False)
+    axQ.plot(phi_list, Q)
+    axQ.axvline(phi_deg, color="red", linestyle="--")
     axQ.grid(alpha=0.3)
-    st.pyplot(figQ, width="stretch")
+    axQ.set_xlabel("위도")
+    axQ.set_ylabel("일사량(W/m²)")
+    st.pyplot(figQ)
 
+    # 남중고도
+    alpha_noon = solar_noon_altitude(math.radians(phi_deg), delta)
     st.subheader("🌅 남중고도")
     st.metric("정오 고도", f"{alpha_noon:.2f}°")
 
-    st.divider()
-    st.markdown(
-        """
-        - 그래프에 면적 음영과 범례를 추가해 위도 변화에 따른 일사량의 흐름을 쉽게 읽을 수 있습니다.
-        """
-    )
 
 # --------------------------------------------
 # 애니메이션 컨트롤
 # --------------------------------------------
-st.subheader("⏯ 날짜 자동 변화 애니메이션")
+st.subheader("⏯ 날짜 자동 변화")
 
 c1, c2, c3 = st.columns(3)
 if c1.button("▶ Start"):
     st.session_state.animate = True
 if c2.button("⏸ Pause"):
     st.session_state.animate = False
-if c3.button("↺ 1월 1일로 리셋"):
+if c3.button("↺ 1월 1일"):
     st.session_state.N = 0
-    st.session_state.month, st.session_state.day = 1, 1
+    st.session_state.animate = False
 
 if st.session_state.animate:
     st.session_state.N = (st.session_state.N + 1) % 365
