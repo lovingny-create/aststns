@@ -118,6 +118,24 @@ def solar_noon_altitude(phi_rad: float, delta: float) -> float:
     )
 
 
+def sun_path_curve(phi_rad: float, delta: float) -> Tuple[np.ndarray, np.ndarray, float]:
+    """Return normalized x/y for the Sun's path on a hemispherical dome view."""
+    cosH0 = -math.tan(phi_rad) * math.tan(delta)
+    cosH0 = max(-1.0, min(1.0, cosH0))
+    H0 = math.acos(cosH0)
+
+    H_range = np.linspace(-H0, H0, 200)
+    alt = np.arcsin(
+        np.sin(phi_rad) * np.sin(delta) +
+        np.cos(phi_rad) * np.cos(delta) * np.cos(H_range)
+    )
+
+    x = np.sin(H_range) / max(abs(np.sin(H0)), 1e-3)
+    y = np.sin(alt)
+    noon_alt = float(np.max(alt))
+    return x, y, noon_alt
+
+
 # ============================================
 # 3. Orbit visualization
 # ============================================
@@ -184,6 +202,45 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     ax.grid(color="#1c2f46", linestyle="--", linewidth=0.6)
     fig.tight_layout(pad=0.6)
 
+    return fig
+
+
+def draw_sun_path(phi_deg: float, delta: float, epsilon_deg: float):
+    """Sky-dome style diagram showing seasonal solar paths and the selected date."""
+
+    phi_rad = math.radians(phi_deg)
+    eps_rad = math.radians(epsilon_deg)
+    declinations = [eps_rad, 0.0, -eps_rad]
+    labels = ["하지", "춘/추분", "동지"]
+    colors = ["#f5c542", "#6fb3ff", "#9ad7a8"]
+
+    fig, ax = plt.subplots(figsize=(2.8, 2.8))
+
+    dome_x = np.linspace(-1, 1, 200)
+    dome_y = np.sqrt(1 - dome_x ** 2)
+    ax.fill_between(dome_x, dome_y, 0, color="#f8fafc", alpha=0.7, edgecolor="#cbd5e1")
+    ax.plot(dome_x, dome_y, color="#94a3b8", linewidth=1.2)
+
+    for dec, label, color in zip(declinations, labels, colors):
+        x, y, noon_alt = sun_path_curve(phi_rad, dec)
+        ax.plot(x, y, color=color, linewidth=1.2, label=f"{label} (δ={math.degrees(dec):.1f}°)")
+        ax.scatter([0], [math.sin(noon_alt)], color=color, s=35, zorder=3)
+
+    x_sel, y_sel, noon_alt_sel = sun_path_curve(phi_rad, delta)
+    ax.plot(x_sel, y_sel, color="#ff6b6b", linewidth=1.8, label="선택 날짜")
+    ax.scatter([0], [math.sin(noon_alt_sel)], color="#ff6b6b", s=40, zorder=4)
+
+    ax.scatter(0, 0, color="#d97757", s=30)
+    ax.text(0, -0.06, "관측자", fontsize=8, ha="center", va="top", color="#0f172a")
+
+    ax.set_xlim(-1.05, 1.05)
+    ax.set_ylim(0, 1.05)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_aspect("equal")
+    ax.legend(loc="upper right", fontsize=7, frameon=False)
+    ax.set_title("하늘에서 본 태양 경로", fontsize=11)
+    fig.tight_layout(pad=0.4)
     return fig
 
 
@@ -369,7 +426,7 @@ info_table_html = f"""
 </table>
 """
 
-top_col_orbit, top_col_chart = st.columns([1, 1])
+top_col_orbit, top_col_chart, top_col_sky = st.columns([1, 1, 1])
 
 with top_col_orbit:
     st.subheader("🛰️ 지구 공전 궤도")
@@ -397,38 +454,37 @@ with top_col_chart:
     figQ.tight_layout(pad=0.5)
     st.pyplot(figQ)
 
+with top_col_sky:
+    st.subheader("🌤️ 태양의 하늘 경로")
+    fig_sky = draw_sun_path(phi_deg, delta, epsilon_deg)
+    st.pyplot(fig_sky)
+
+    st.subheader("⏯ 날짜 자동 변화")
+    ctrl_cols = st.columns([1, 1, 1, 1.8])
+
+    with ctrl_cols[0]:
+        if st.button("▶ Start"):
+            st.session_state.N = day_of_year(st.session_state.month, st.session_state.day)
+            st.session_state.animate = True
+
+    with ctrl_cols[1]:
+        if st.button("⏸ Pause"):
+            st.session_state.animate = False
+
+    with ctrl_cols[2]:
+        if st.button("↺ 1월 1일"):
+            st.session_state.N = 0
+            st.session_state.animate = False
+
+    with ctrl_cols[3]:
+        st.markdown("<div style='margin-top:2px'></div>", unsafe_allow_html=True)
+        anim_speed = st.slider(
+            "애니메이션 속도(ms)", 1, 200, st.session_state.anim_speed, key="anim_speed_slider"
+        )
+        st.session_state.anim_speed = anim_speed
+
 st.subheader("🌞 현재 태양 위치 정보")
 st.markdown(info_table_html, unsafe_allow_html=True)
-
-
-# --------------------------------------------
-# 애니메이션 컨트롤
-# --------------------------------------------
-st.subheader("⏯ 날짜 자동 변화")
-
-controls_col = st.container()
-btn_start, btn_pause, btn_reset, col_speed = controls_col.columns([1, 1, 1, 2.2])
-
-with btn_start:
-    if st.button("▶ Start"):
-        st.session_state.N = day_of_year(st.session_state.month, st.session_state.day)
-        st.session_state.animate = True
-
-with btn_pause:
-    if st.button("⏸ Pause"):
-        st.session_state.animate = False
-
-with btn_reset:
-    if st.button("↺ 1월 1일"):
-        st.session_state.N = 0
-        st.session_state.animate = False
-
-with col_speed:
-    st.markdown("<div style='margin-top:4px'></div>", unsafe_allow_html=True)
-    anim_speed = st.slider(
-        "애니메이션 속도(ms)", 1, 200, st.session_state.anim_speed, key="anim_speed_slider"
-    )
-    st.session_state.anim_speed = anim_speed
 
 if st.session_state.animate:
     st.session_state.N = (st.session_state.N + 1) % 365
