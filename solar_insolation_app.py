@@ -119,7 +119,7 @@ def solar_noon_altitude(phi_rad: float, delta: float) -> float:
 
 
 def sun_path_curve(phi_rad: float, delta: float) -> Tuple[np.ndarray, np.ndarray, float]:
-    """Return normalized x/y for the Sun's path on a hemispherical dome view."""
+    """Return hour offsets (radians), altitude (radians), and noon altitude."""
     cosH0 = -math.tan(phi_rad) * math.tan(delta)
     cosH0 = max(-1.0, min(1.0, cosH0))
     H0 = math.acos(cosH0)
@@ -130,10 +130,8 @@ def sun_path_curve(phi_rad: float, delta: float) -> Tuple[np.ndarray, np.ndarray
         np.cos(phi_rad) * np.cos(delta) * np.cos(H_range)
     )
 
-    x = np.sin(H_range) / max(abs(np.sin(H0)), 1e-3)
-    y = np.sin(alt)
     noon_alt = float(np.max(alt))
-    return x, y, noon_alt
+    return H_range, alt, noon_alt
 
 
 # ============================================
@@ -206,7 +204,7 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
 
 
 def draw_sun_path(phi_deg: float, delta: float, epsilon_deg: float):
-    """Sky-dome style diagram showing seasonal solar paths and the selected date."""
+    """2D 천구도 스타일로 태양 고도 변화를 표시."""
 
     phi_rad = math.radians(phi_deg)
     eps_rad = math.radians(epsilon_deg)
@@ -214,46 +212,35 @@ def draw_sun_path(phi_deg: float, delta: float, epsilon_deg: float):
     labels = ["하지", "춘/추분", "동지"]
     colors = ["#f5c542", "#6fb3ff", "#9ad7a8"]
 
-    fig, ax = plt.subplots(figsize=(2.8, 2.8))
+    fig, ax = plt.subplots(figsize=(2.8, 2.6))
 
-    # 3D 느낌을 주기 위한 원근 변환 값
-    x_scale = 1.15
-    y_scale = 0.9
-    ground_ellipse = np.linspace(0, 2 * np.pi, 240)
-    gx = np.cos(ground_ellipse) * x_scale
-    gy = np.sin(ground_ellipse) * 0.35
-
-    # 돔과 지면
-    dome_t = np.linspace(-np.pi / 2, np.pi / 2, 240)
-    dome_x = x_scale * np.cos(dome_t)
-    dome_y = y_scale * (np.sin(dome_t) + 1) / 2
-    ax.fill_between(dome_x, dome_y, 0, color="#eef2ff", alpha=0.75, edgecolor="#cbd5e1")
-    ax.fill(gx, gy, color="#d9d2b2", alpha=0.85, edgecolor="#b59d73", linewidth=1)
-    ax.plot(dome_x, dome_y, color="#9ca3af", linewidth=1.2)
-    ax.plot(gx, gy, color="#b59d73", linewidth=0.8)
+    ax.axhspan(0, 90, color="#eef2ff", alpha=0.8)
+    ax.axhline(0, color="#9ca3af", linewidth=1.0)
+    ax.text(12, -7, "지평선", ha="center", va="top", fontsize=8, color="#4b5563")
 
     for dec, label, color in zip(declinations, labels, colors):
-        x, y, noon_alt = sun_path_curve(phi_rad, dec)
-        x3d = x * x_scale
-        y3d = 0.35 + y * y_scale
-        ax.plot(x3d, y3d, color=color, linewidth=1.2, label=f"{label} (δ={math.degrees(dec):.1f}°)")
-        ax.scatter([0], [0.35 + math.sin(noon_alt) * y_scale], color=color, s=30, zorder=3)
+        H_range, alt, noon_alt = sun_path_curve(phi_rad, dec)
+        hours = 12 + (H_range / math.pi) * 12
+        alt_deg = np.degrees(alt)
+        ax.plot(hours, alt_deg, color=color, linewidth=1.4, label=f"{label} (δ={math.degrees(dec):.1f}°)")
+        ax.scatter(12, math.degrees(noon_alt), color=color, s=20, zorder=3)
 
-    x_sel, y_sel, noon_alt_sel = sun_path_curve(phi_rad, delta)
-    ax.plot(x_sel * x_scale, 0.35 + y_sel * y_scale, color="#ff6b6b", linewidth=1.8, label="선택 날짜")
-    ax.scatter([0], [0.35 + math.sin(noon_alt_sel) * y_scale], color="#ff6b6b", s=36, zorder=4)
+    H_sel, alt_sel, noon_alt_sel = sun_path_curve(phi_rad, delta)
+    hours_sel = 12 + (H_sel / math.pi) * 12
+    alt_sel_deg = np.degrees(alt_sel)
+    ax.plot(hours_sel, alt_sel_deg, color="#ff6b6b", linewidth=2.0, label="선택 날짜")
+    ax.scatter(12, math.degrees(noon_alt_sel), color="#ff6b6b", s=26, zorder=4)
 
-    ax.scatter(0, 0.35, color="#9f7050", s=26, zorder=5)
-    ax.text(0, 0.28, "관측자", fontsize=8, ha="center", va="top", color="#0f172a")
-
-    ax.set_xlim(-1.25, 1.25)
-    ax.set_ylim(0, 1.3)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_aspect("equal")
+    ax.set_xlim(0, 24)
+    ax.set_ylim(-10, 95)
+    ax.set_xticks([0, 6, 12, 18, 24])
+    ax.set_yticks(range(0, 91, 30))
+    ax.set_xlabel("태양시 (h)", fontsize=9)
+    ax.set_ylabel("고도 (°)", fontsize=9)
     ax.legend(loc="upper right", fontsize=7, frameon=False)
     ax.set_title("하늘에서 본 태양 경로", fontsize=11)
-    fig.tight_layout(pad=0.35)
+    ax.grid(alpha=0.3)
+    fig.tight_layout(pad=0.4)
     return fig
 
 
