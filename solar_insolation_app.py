@@ -146,12 +146,13 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     peri_xR, peri_yR = peri_x, peri_y
     ap_xR, ap_yR = ap_x, ap_y
 
-    fig, ax = plt.subplots(figsize=(2.8, 2.8), facecolor="#0a0f1c")
+    fig, ax = plt.subplots(figsize=(2.4, 2.4), facecolor="#0a0f1c")
     ax.set_facecolor("#0a0f1c")
 
-    ax.plot(xR, yR, linestyle="--", color="#4db7ff", linewidth=2)
-    ax.scatter(0, 0, s=320, color="#0d5c84", edgecolors="white", linewidths=2, label="태양")
-    ax.scatter(xE_R, yE_R, s=120, color="#78ffba", edgecolors="#0a0f1c", linewidths=1.5, label="지구")
+    ax.plot(xR, yR, linestyle="--", color="#4db7ff", linewidth=1.6)
+    ax.scatter(0, 0, s=180, color="#0d5c84", edgecolors="white", linewidths=1.5, label="태양")
+    ax.text(0, 0, "☀", color="#ffef9f", fontsize=18, ha="center", va="center", weight="bold")
+    ax.scatter(xE_R, yE_R, s=90, color="#78ffba", edgecolors="#0a0f1c", linewidths=1.2, label="지구")
 
     # 자전축
     L = 0.35
@@ -165,21 +166,23 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     )
 
     # 근일점/원일점 라벨
-    ax.scatter(peri_xR, peri_yR, s=140, color="#78ffba", alpha=0.7)
-    ax.scatter(ap_xR, ap_yR, s=140, color="#78ffba", alpha=0.7)
-    ax.text(peri_xR - 0.05, peri_yR + 0.18, "근일점", color="white", ha="right", fontsize=11, weight="bold")
-    ax.text(ap_xR + 0.05, ap_yR + 0.18, "원일점", color="white", ha="left", fontsize=11, weight="bold")
+    ax.scatter(peri_xR, peri_yR, s=90, color="#78ffba", alpha=0.8)
+    ax.scatter(ap_xR, ap_yR, s=90, color="#78ffba", alpha=0.8)
+    ax.text(peri_xR - 0.04, peri_yR + 0.16, "근일점", color="white", ha="right", fontsize=10, weight="bold")
+    ax.text(ap_xR + 0.04, ap_yR + 0.16, "원일점", color="white", ha="left", fontsize=10, weight="bold")
 
     ax.set_aspect("equal")
     R = 1 + e_vis + 0.55
     ax.set_xlim(-R, R)
     ax.set_ylim(-R, R)
-    ax.set_title("지구 공전 궤도", color="white", fontsize=14)
-    ax.tick_params(colors="white", labelsize=8)
+    ax.set_title("지구 공전 궤도", color="white", fontsize=12)
+    ax.tick_params(colors="#0a0f1c", labelsize=6)  # hide coordinates
+    ax.set_xticks([])
+    ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_color("#1c2f46")
-    ax.grid(color="#1c2f46", linestyle="--", linewidth=0.7)
-    fig.tight_layout(pad=1.0)
+    ax.grid(color="#1c2f46", linestyle="--", linewidth=0.6)
+    fig.tight_layout(pad=0.6)
 
     return fig
 
@@ -377,11 +380,20 @@ with top_col_chart:
     st.subheader("📈 위도별 하루 태양 에너지량 (W/m²)")
 
     figQ, axQ = plt.subplots(figsize=(2.8, 2.8))
-    axQ.plot(phi_list, Q)
-    axQ.axvline(phi_deg, color="red", linestyle="--")
+    axQ.plot(phi_list, Q, linewidth=1.6)
+    axQ.axvline(phi_deg, color="red", linestyle="--", linewidth=1.2)
     axQ.grid(alpha=0.3)
-    axQ.set_xlabel("위도")
-    axQ.set_ylabel("일사량(W/m²)")
+    axQ.set_xlabel("위도", fontsize=9)
+    axQ.set_ylabel("일사량(W/m²)", fontsize=9)
+
+    xticks = np.arange(-90, 91, 30)
+    axQ.set_xticks(xticks)
+    xtick_labels = [
+        f"{abs(val)}°S" if val < 0 else (f"{val}°N" if val > 0 else "적도")
+        for val in xticks
+    ]
+    axQ.set_xticklabels(xtick_labels, fontsize=8)
+    axQ.tick_params(axis="y", labelsize=8)
     figQ.tight_layout(pad=0.5)
     st.pyplot(figQ)
 
