@@ -143,28 +143,47 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     xE_R = xE * np.cos(omega) - yE * np.sin(omega)
     yE_R = xE * np.sin(omega) + yE * np.cos(omega)
 
-    fig, ax = plt.subplots(figsize=(6, 6))
-    ax.plot(xR, yR)
-    ax.scatter(0, 0, s=200, color="yellow", label="태양")
-    ax.scatter(xE_R, yE_R, s=100, color="blue", label="지구")
+    peri_x, peri_y = -a * (1 - e_vis), 0
+    ap_x, ap_y = a * (1 + e_vis), 0
+    peri_xR = peri_x * np.cos(omega) - peri_y * np.sin(omega)
+    peri_yR = peri_x * np.sin(omega) + peri_y * np.cos(omega)
+    ap_xR = ap_x * np.cos(omega) - ap_y * np.sin(omega)
+    ap_yR = ap_x * np.sin(omega) + ap_y * np.cos(omega)
+
+    fig, ax = plt.subplots(figsize=(5, 5), facecolor="#0a0f1c")
+    ax.set_facecolor("#0a0f1c")
+
+    ax.plot(xR, yR, linestyle="--", color="#4db7ff", linewidth=2)
+    ax.scatter(0, 0, s=320, color="#0d5c84", edgecolors="white", linewidths=2, label="태양")
+    ax.scatter(xE_R, yE_R, s=120, color="#78ffba", edgecolors="#0a0f1c", linewidths=1.5, label="지구")
 
     # 자전축
-    L = 0.3
+    L = 0.35
     dx = L * math.sin(eps)
     dy = L * math.cos(eps)
     ax.plot(
         [xE_R - dx / 2, xE_R + dx / 2],
         [yE_R - dy / 2, yE_R + dy / 2],
-        color="black",
+        color="white",
         linewidth=2,
     )
 
+    # 근일점/원일점 라벨
+    ax.scatter(peri_xR, peri_yR, s=140, color="#78ffba", alpha=0.7)
+    ax.scatter(ap_xR, ap_yR, s=140, color="#78ffba", alpha=0.7)
+    ax.text(peri_xR - 0.05, peri_yR + 0.18, "근일점", color="white", ha="right", fontsize=11, weight="bold")
+    ax.text(ap_xR + 0.05, ap_yR + 0.18, "원일점", color="white", ha="left", fontsize=11, weight="bold")
+
     ax.set_aspect("equal")
-    R = 1 + e_vis + 0.5
+    R = 1 + e_vis + 0.55
     ax.set_xlim(-R, R)
     ax.set_ylim(-R, R)
-    ax.set_title("지구 공전 궤도")
-    ax.grid()
+    ax.set_title("지구 공전 궤도", color="white", fontsize=14)
+    ax.tick_params(colors="white", labelsize=8)
+    for spine in ax.spines.values():
+        spine.set_color("#1c2f46")
+    ax.grid(color="#1c2f46", linestyle="--", linewidth=0.7)
+    fig.tight_layout(pad=1.0)
 
     return fig
 
@@ -271,7 +290,7 @@ with st.sidebar:
 # --------------------------------------------
 # 메인 패널
 # --------------------------------------------
-colL, colR = st.columns([1.15, 1])
+colL, colR = st.columns([1, 1])
 
 with colL:
     # 날짜 → N 변환
@@ -302,12 +321,13 @@ with colR:
     phi_rad_all = np.radians(phi_list)
     Q = daily_insolation(phi_rad_all, delta, e, lam, omega_deg)
 
-    figQ, axQ = plt.subplots(figsize=(6, 4))
+    figQ, axQ = plt.subplots(figsize=(5, 3.2))
     axQ.plot(phi_list, Q)
     axQ.axvline(phi_deg, color="red", linestyle="--")
     axQ.grid(alpha=0.3)
     axQ.set_xlabel("위도")
     axQ.set_ylabel("일사량(W/m²)")
+    figQ.tight_layout(pad=0.5)
     st.pyplot(figQ)
 
     # 남중고도
@@ -339,6 +359,7 @@ st.subheader("⏯ 날짜 자동 변화")
 
 c1, c2, c3 = st.columns(3)
 if c1.button("▶ Start"):
+    st.session_state.N = day_of_year(st.session_state.month, st.session_state.day)
     st.session_state.animate = True
 if c2.button("⏸ Pause"):
     st.session_state.animate = False
