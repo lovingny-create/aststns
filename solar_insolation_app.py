@@ -253,7 +253,7 @@ st.title("밀란코비치 주기에 따른 기후 변화")
 st.markdown(
     """
     <style>
-    .block-container { padding-top: 0.6rem; padding-bottom: 1.3rem; }
+    .block-container { padding-top: 1.0rem; padding-bottom: 1.3rem; }
     h1 { margin-bottom: 0.4rem; }
     </style>
     """,
@@ -305,25 +305,22 @@ def reset_state():
     st.session_state.anim_speed_slider = INIT_SPEED
 
 # --------------------------------------------
-# 입력 UI
+# 입력 UI (메인 영역 상단)
 # --------------------------------------------
-with st.sidebar:
-    st.header("입력값")
-
+ctrl = st.container()
+with ctrl:
     st.markdown(
         """
         <style>
         .stButton>button {
             white-space: nowrap;
-            font-size: 14px;
-            padding: 0.35rem 0.75rem;
+            font-size: 13px;
+            padding: 0.3rem 0.6rem;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
-
-    st.subheader("날짜 선택")
 
     # 애니메이션 중에는 month/day 자동 갱신
     if st.session_state.animate:
@@ -331,24 +328,23 @@ with st.sidebar:
         st.session_state.month = m
         st.session_state.day = d
 
-    c_month, c_day = st.columns(2)
+    st.subheader("날짜 선택")
+    date_cols = st.columns([1, 1, 2, 2])
     month = int(
-        c_month.selectbox("월", list(range(1, 13)), index=st.session_state.month - 1)
+        date_cols[0].selectbox("월", list(range(1, 13)), index=st.session_state.month - 1)
     )
     max_day = DAYS_IN_MONTH[month - 1]
     day = int(
-        c_day.selectbox(
+        date_cols[1].selectbox(
             "일",
             list(range(1, max_day + 1)),
             index=min(st.session_state.day, max_day) - 1,
         )
     )
-
     st.session_state.month = month
     st.session_state.day = day
 
-    cA, cB, cC, cD = st.columns(4)
-
+    spacer_L, cA, cB, cC, cD, spacer_R = st.columns([1, 1, 1, 1, 1, 1])
     if cA.button("춘분"):
         st.session_state.month = 3
         st.session_state.day = 20
@@ -374,14 +370,11 @@ with st.sidebar:
         trigger_rerun()
 
     st.subheader("관측자 위도")
-    lat_cols = st.columns([1, 1, 2.2])
+    lat_cols = st.columns([1, 2.4, 1])
     with lat_cols[0]:
         if st.button("−", help="위도 1° 감소"):
             st.session_state.phi_deg = max(-90.0, st.session_state.phi_deg - 1)
     with lat_cols[1]:
-        if st.button("+", help="위도 1° 증가"):
-            st.session_state.phi_deg = min(90.0, st.session_state.phi_deg + 1)
-    with lat_cols[2]:
         phi_deg = st.number_input(
             "위도 (°)",
             -90.0,
@@ -391,6 +384,9 @@ with st.sidebar:
             format="%.1f",
         )
         st.session_state.phi_deg = phi_deg
+    with lat_cols[2]:
+        if st.button("+", help="위도 1° 증가"):
+            st.session_state.phi_deg = min(90.0, st.session_state.phi_deg + 1)
 
     st.subheader("밀란코비치 변수")
     e = st.slider("이심률 e", 0.0, 0.1, 0.0167, 0.0001, key="e")
