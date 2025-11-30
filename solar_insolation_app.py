@@ -175,7 +175,7 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
 st.set_page_config(layout="wide")
 ensure_korean_font()
 
-st.title("🌍 고등학생용 지구 공전·일사량 시뮬레이터")
+st.title("밀란코비치 주기에 따른 기후 변화")
 
 if "animate" not in st.session_state:
     st.session_state.animate = False
@@ -188,9 +188,9 @@ if "day" not in st.session_state:
 if "e" not in st.session_state:
     st.session_state.e = 0.0167
 if "omega_deg" not in st.session_state:
-    st.session_state.omega_deg = 102.0
+    st.session_state.omega_deg = 102.9372
 if "epsilon_deg" not in st.session_state:
-    st.session_state.epsilon_deg = 23.4
+    st.session_state.epsilon_deg = 23.44
 if "phi_deg" not in st.session_state:
     st.session_state.phi_deg = 37.0
 
@@ -208,9 +208,18 @@ with st.sidebar:
         st.session_state.month = m
         st.session_state.day = d
 
-    month = int(st.number_input("월", 1, 12, st.session_state.month))
+    c_month, c_day = st.columns(2)
+    month = int(
+        c_month.selectbox("월", list(range(1, 13)), index=st.session_state.month - 1)
+    )
     max_day = DAYS_IN_MONTH[month - 1]
-    day = int(st.number_input("일", 1, max_day, min(st.session_state.day, max_day)))
+    day = int(
+        c_day.selectbox(
+            "일",
+            list(range(1, max_day + 1)),
+            index=min(st.session_state.day, max_day) - 1,
+        )
+    )
 
     st.session_state.month = month
     st.session_state.day = day
@@ -246,8 +255,12 @@ with st.sidebar:
 
     st.subheader("공전 매개변수")
     e = st.slider("이심률 e", 0.0, 0.1, st.session_state.e, 0.0001, key="e")
-    omega_deg = st.slider("세차(ω)", 0.0, 360.0, st.session_state.omega_deg, key="omega_deg")
-    epsilon_deg = st.slider("축 경사(ε)", 0.0, 40.0, st.session_state.epsilon_deg, key="epsilon_deg")
+    omega_deg = st.slider(
+        "세차(ω)", 0.0, 360.0, st.session_state.omega_deg, key="omega_deg"
+    )
+    epsilon_deg = st.slider(
+        "축 경사(ε)", 0.0, 40.0, st.session_state.epsilon_deg, key="epsilon_deg"
+    )
 
     st.subheader("관측자 위도")
     phi_deg = st.slider("위도", -90.0, 90.0, st.session_state.phi_deg, key="phi_deg")
@@ -298,9 +311,25 @@ with colR:
     st.pyplot(figQ)
 
     # 남중고도
-    alpha_noon = solar_noon_altitude(math.radians(phi_deg), delta)
-    st.subheader("🌅 남중고도")
-    st.metric("정오 고도", f"{alpha_noon:.2f}°")
+    phi_rad = math.radians(phi_deg)
+    alpha_noon = solar_noon_altitude(phi_rad, delta)
+    Q_at_lat = float(daily_insolation(np.array([phi_rad]), delta, e, lam, omega_deg)[0])
+
+    cosH0 = -math.tan(phi_rad) * math.tan(delta)
+    cosH0 = max(-1.0, min(1.0, cosH0))
+    H0 = math.acos(cosH0)
+    daylight_hours = 24 * H0 / math.pi
+    hours = int(daylight_hours)
+    minutes = round((daylight_hours - hours) * 60)
+    if minutes == 60:
+        hours += 1
+        minutes = 0
+
+    st.subheader("🌅 남중고도 · 일사량 · 낮 길이")
+    c_alt, c_q, c_daylen = st.columns(3)
+    c_alt.metric("정오 고도", f"{alpha_noon:.2f}°")
+    c_q.metric("일사량", f"{Q_at_lat:.0f} W/m²")
+    c_daylen.metric("낮 길이", f"{hours}시간 {minutes:02d}분")
 
 
 # --------------------------------------------
