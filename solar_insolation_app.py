@@ -37,10 +37,14 @@ def ensure_korean_font():
     )
 
     if not os.path.exists(font_path):
-        urllib.request.urlretrieve(url, font_path)
+        try:
+            urllib.request.urlretrieve(url, font_path)
+        except Exception:
+            font_path = None
 
-    font_manager.fontManager.addfont(font_path)
-    plt.rcParams["font.family"] = "NanumGothic"
+    if font_path and os.path.exists(font_path):
+        font_manager.fontManager.addfont(font_path)
+        plt.rcParams["font.family"] = "NanumGothic"
     plt.rcParams["axes.unicode_minus"] = False
 
 
@@ -305,7 +309,7 @@ st.markdown(
 INIT_MONTH = 3
 INIT_DAY = 21
 INIT_E = 0.0167
-INIT_PRECESSION_YEAR = 0
+INIT_PRECESSION_YEAR = int(round(26000 * 102.0 / 360.0))  # ≈ 현재 지구 세차 위치(ω≈102°)
 INIT_OMEGA = (INIT_PRECESSION_YEAR / 26000) * 360
 INIT_EPS = 23.44
 INIT_PHI = 37.0
@@ -449,12 +453,10 @@ active_N = (
 )
 
 omega_rad = math.radians(omega_deg)
-# 날짜(춘분 기준) → 평균근점이각 → 편심근점이각 → 진근점이각 → 황경
-mean_longitude = 2 * math.pi * ((active_N - EQUINOX_N) / YEAR_DAYS)
-M = (mean_longitude - omega_rad) % (2 * math.pi)
-E_val = eccentric_anomaly(M, e)
-v = true_anomaly_from_eccentric(E_val, e)
-lam = (v + omega_rad) % (2 * math.pi)
+# 날짜(춘분 기준) → 황경 → 진근점이각 → 편심근점이각
+lam = (2 * math.pi * (active_N - EQUINOX_N) / YEAR_DAYS) % (2 * math.pi)
+v = (lam - omega_rad) % (2 * math.pi)
+E_val = eccentric_from_true(v, e)
 delta = solar_declination(lam, epsilon_deg)
 
 phi_list = np.linspace(-90, 90, 181)
