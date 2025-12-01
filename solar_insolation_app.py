@@ -348,17 +348,10 @@ if "records" not in st.session_state:
 
 
 def reset_state():
-    """Restore all interactive values to the app's initial defaults."""
-    st.session_state.month = INIT_MONTH
-    st.session_state.day = INIT_DAY
-    st.session_state.N = INIT_N
-    st.session_state.animate = False
-    st.session_state.e = INIT_E
-    st.session_state.precession_year = INIT_PRECESSION_YEAR
-    st.session_state.omega_deg = INIT_OMEGA
-    st.session_state.epsilon_deg = INIT_EPS
-    st.session_state.phi_deg = INIT_PHI
-    st.session_state.anim_speed = INIT_SPEED
+    """Clear all Streamlit state so widgets return to their defaults."""
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    trigger_rerun()
 
 # --------------------------------------------
 # 입력 UI (사이드바)
