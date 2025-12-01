@@ -84,7 +84,14 @@ def true_anomaly(E: float, e: float) -> float:
 
 
 def solar_declination(v: float, omega_deg: float, epsilon_deg: float) -> Tuple[float, float]:
-    lam = v + math.radians(omega_deg) + math.pi  # Earth-Sun phase shift
+    """Return solar declination and true ecliptic longitude.
+
+    lam (λ) is measured from the vernal equinox and combines the true anomaly
+    v with the argument of perihelion ω. Using this definition keeps the
+    equinox at δ=0° so the declination curve is symmetric about the equator.
+    """
+
+    lam = (v + math.radians(omega_deg)) % (2 * math.pi)
     eps = math.radians(epsilon_deg)
     delta = math.asin(math.sin(eps) * math.sin(lam))
     return delta, lam
@@ -97,7 +104,8 @@ S0 = 1361
 
 
 def daily_insolation(phi_rad: np.ndarray, delta: float, e: float, lam: float, omega_deg: float) -> np.ndarray:
-    rfac = ((1 + e * math.cos(lam - math.radians(omega_deg))) / (1 - e * e)) ** 2
+    omega_rad = math.radians(omega_deg)
+    rfac = ((1 + e * math.cos(lam - omega_rad)) / (1 - e * e)) ** 2
 
     cosH0 = -np.tan(phi_rad) * np.tan(delta)
     cosH0 = np.clip(cosH0, -1, 1)
@@ -144,7 +152,7 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
 
     a = 1.0
     b = a * math.sqrt(1 - e_vis * e_vis)
-    eps = math.radians(epsilon_deg)
+    eps_rad = math.radians(epsilon_deg)
     omega_rad = math.radians(omega_deg)
     view_tilt = math.radians(15)  # 공전면을 약간 위에서 내려다보기
 
@@ -171,17 +179,41 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     ax.text(0, 0, "☀", color="#ffef9f", fontsize=18, ha="center", va="center", weight="bold")
     ax.scatter(xE_R, yE_R, s=70, color="#78ffba", edgecolors="#0a0f1c", linewidths=1.2)
 
-    # 자전축
-    L = 0.35
-    dx_base = L * math.sin(eps)
-    dy_base = L * math.cos(eps) * math.cos(view_tilt)
+    # 회전 행렬
+    def R_z(theta):
+        return np.array(
+            [
+                [math.cos(theta), -math.sin(theta), 0],
+                [math.sin(theta), math.cos(theta), 0],
+                [0, 0, 1],
+            ]
+        )
 
-    # 세차 각도에 따라 자전축 방향도 함께 회전 (반시계 증가)
-    dx = dx_base * math.cos(omega_rad) - dy_base * math.sin(omega_rad)
-    dy = dx_base * math.sin(omega_rad) + dy_base * math.cos(omega_rad)
+    def R_x(theta):
+        return np.array(
+            [
+                [1, 0, 0],
+                [0, math.cos(theta), -math.sin(theta)],
+                [0, math.sin(theta), math.cos(theta)],
+            ]
+        )
+
+    # 자전축을 3D로 계산해 공전 위상과 세차를 모두 반영
+    base_axis = np.array([0.0, 0.0, 1.0])
+    axis_3d = R_z(E_now) @ R_z(omega_rad) @ R_x(-eps_rad) @ base_axis
+
+    axis_proj = np.array(
+        [
+            axis_3d[0],
+            axis_3d[1] * math.cos(view_tilt) - axis_3d[2] * math.sin(view_tilt),
+        ]
+    )
+    axis_proj = axis_proj / np.linalg.norm(axis_proj)
+
+    L = 0.35
     ax.plot(
-        [xE_R - dx / 2, xE_R + dx / 2],
-        [yE_R - dy / 2, yE_R + dy / 2],
+        [xE_R - axis_proj[0] * L, xE_R + axis_proj[0] * L],
+        [yE_R - axis_proj[1] * L, yE_R + axis_proj[1] * L],
         color="white",
         linewidth=2,
     )
