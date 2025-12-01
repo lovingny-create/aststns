@@ -611,9 +611,56 @@ if rec_cols[1].button("🗑️ All Clear"):
 
 if st.session_state.records:
     df_records = pd.DataFrame(st.session_state.records)
-    st.dataframe(df_records, use_container_width=True, height=240)
 
-    csv_bytes = df_records.to_csv(index=False).encode("utf-8-sig")
+    rename_map = {
+        "month": "월",
+        "day": "일",
+        "latitude_deg": "위도(°)",
+        "declination_deg": "태양 적위(°)",
+        "noon_altitude_deg": "정오 고도(°)",
+        "insolation_Wm2": "일사량(W/m²)",
+        "day_length_hours": "낮 길이(시간)",
+        "avg_temp_C": "평균 기온(°C)",
+        "eccentricity": "이심률 e",
+        "precession_deg": "세차 각도(°)",
+        "axial_tilt_deg": "축 경사 ε(°)",
+    }
+
+    display_cols = [
+        "월",
+        "일",
+        "위도(°)",
+        "태양 적위(°)",
+        "정오 고도(°)",
+        "일사량(W/m²)",
+        "낮 길이(시간)",
+        "평균 기온(°C)",
+        "이심률 e",
+        "세차 각도(°)",
+        "축 경사 ε(°)",
+    ]
+
+    display_df = df_records.rename(columns=rename_map)[display_cols]
+
+    float_cols = [
+        "위도(°)",
+        "태양 적위(°)",
+        "정오 고도(°)",
+        "일사량(W/m²)",
+        "낮 길이(시간)",
+        "평균 기온(°C)",
+        "이심률 e",
+        "세차 각도(°)",
+        "축 경사 ε(°)",
+    ]
+
+    display_df[float_cols] = display_df[float_cols].apply(
+        pd.to_numeric, errors="coerce"
+    ).round(2)
+
+    st.dataframe(display_df, use_container_width=True, height=240)
+
+    csv_bytes = display_df.to_csv(index=False).encode("utf-8-sig")
     rec_cols[2].download_button(
         label="📥 CSV 다운로드",
         data=csv_bytes,
