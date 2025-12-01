@@ -10,6 +10,7 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import streamlit as st
 from matplotlib import font_manager
 
@@ -336,6 +337,8 @@ if "omega_deg" not in st.session_state:
     st.session_state.omega_deg = INIT_OMEGA
 if "epsilon_deg" not in st.session_state:
     st.session_state.epsilon_deg = INIT_EPS
+if "records" not in st.session_state:
+    st.session_state.records = []
 
 
 def reset_state():
@@ -581,6 +584,42 @@ with top_col_sky:
 
 st.subheader("🌞 현재 태양 위치 정보")
 st.markdown(info_table_html, unsafe_allow_html=True)
+
+st.subheader("📘 관측 기록")
+rec_cols = st.columns([1, 1, 2])
+
+if rec_cols[0].button("📌 기록"):
+    record = {
+        "month": st.session_state.month,
+        "day": st.session_state.day,
+        "latitude_deg": st.session_state.phi_deg,
+        "declination_deg": math.degrees(delta),
+        "noon_altitude_deg": alpha_noon,
+        "insolation_Wm2": Q_at_lat,
+        "day_length_hours": daylight_hours,
+        "avg_temp_C": avg_temp,
+        "eccentricity": st.session_state.e,
+        "precession_deg": st.session_state.omega_deg,
+        "axial_tilt_deg": st.session_state.epsilon_deg,
+    }
+    st.session_state.records.append(record)
+    st.success("기록을 저장했습니다.")
+
+if rec_cols[1].button("🗑️ All Clear"):
+    st.session_state.records = []
+    st.warning("모든 기록을 삭제했습니다.")
+
+if st.session_state.records:
+    df_records = pd.DataFrame(st.session_state.records)
+    st.dataframe(df_records, use_container_width=True, height=240)
+
+    csv_bytes = df_records.to_csv(index=False).encode("utf-8-sig")
+    rec_cols[2].download_button(
+        label="📥 CSV 다운로드",
+        data=csv_bytes,
+        file_name="milankovitch_records.csv",
+        mime="text/csv",
+    )
 
 if st.session_state.animate:
     st.session_state.N = (st.session_state.N + 1) % 365
