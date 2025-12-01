@@ -70,6 +70,17 @@ def eccentric_from_true(v: float, e: float) -> float:
     return 2 * math.atan2(factor * math.tan(v / 2), 1)
 
 
+def eccentric_anomaly(M: float, e: float, n_iter: int = 6) -> float:
+    """Solve Kepler's equation M = E - e sin(E) for eccentric anomaly E."""
+
+    E = M
+    for _ in range(n_iter):
+        f = E - e * math.sin(E) - M
+        fprime = 1 - e * math.cos(E)
+        E = E - f / fprime
+    return E
+
+
 def true_anomaly_from_eccentric(E: float, e: float) -> float:
     num = math.sqrt(1 + e) * math.sin(E / 2)
     den = math.sqrt(1 - e) * math.cos(E / 2)
@@ -436,11 +447,12 @@ active_N = (
 )
 
 omega_rad = math.radians(omega_deg)
-mean_longitude = (2 * math.pi * (active_N / YEAR_DAYS))
-lambda_equinox = (2 * math.pi * (EQUINOX_N / YEAR_DAYS))
-lam = (mean_longitude - lambda_equinox) % (2 * math.pi)
-v = (lam - omega_rad) % (2 * math.pi)
-E_val = eccentric_from_true(v, e)
+
+# 날짜 → 평균근점이각 → 편심근점이각 → 진근점이각 → 황경
+M = 2 * math.pi * (active_N / YEAR_DAYS)
+E_val = eccentric_anomaly(M, e)
+v = true_anomaly_from_eccentric(E_val, e)
+lam = (v + omega_rad) % (2 * math.pi)
 delta = solar_declination(lam, epsilon_deg)
 
 phi_list = np.linspace(-90, 90, 181)
