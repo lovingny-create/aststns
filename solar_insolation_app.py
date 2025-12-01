@@ -17,6 +17,7 @@ from matplotlib import font_manager
 # 0. 날짜 처리
 # ============================================
 DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+YEAR_DAYS = 365.2422
 
 
 def trigger_rerun():
@@ -62,39 +63,24 @@ def month_day_from_day_of_year(N: int) -> Tuple[int, int]:
 # ============================================
 # 1. Orbital mechanics
 # ============================================
-def mean_anomaly(N: int, M0_deg: float = -3.0) -> float:
-    deg_per_day = 360.0 / 365.25
-    M_deg = M0_deg + deg_per_day * N
-    return math.radians(M_deg)
+def eccentric_from_true(v: float, e: float) -> float:
+    """Return eccentric anomaly for a given true anomaly."""
+
+    factor = math.sqrt((1 - e) / (1 + e))
+    return 2 * math.atan2(factor * math.tan(v / 2), 1)
 
 
-def eccentric_anomaly(M: float, e: float, n_iter: int = 6) -> float:
-    E = M
-    for _ in range(n_iter):
-        f = E - e * math.sin(E) - M
-        fprime = 1 - e * math.cos(E)
-        E = E - f / fprime
-    return E
-
-
-def true_anomaly(E: float, e: float) -> float:
+def true_anomaly_from_eccentric(E: float, e: float) -> float:
     num = math.sqrt(1 + e) * math.sin(E / 2)
     den = math.sqrt(1 - e) * math.cos(E / 2)
     return 2 * math.atan2(num, den)
 
 
-def solar_declination(v: float, omega_deg: float, epsilon_deg: float) -> Tuple[float, float]:
-    """Return solar declination and true ecliptic longitude.
+def solar_declination(lam: float, epsilon_deg: float) -> float:
+    """Return solar declination from ecliptic longitude."""
 
-    lam (λ) is measured from the vernal equinox and combines the true anomaly
-    v with the argument of perihelion ω. Using this definition keeps the
-    equinox at δ=0° so the declination curve is symmetric about the equator.
-    """
-
-    lam = (v + math.radians(omega_deg)) % (2 * math.pi)
     eps = math.radians(epsilon_deg)
-    delta = math.asin(math.sin(eps) * math.sin(lam))
-    return delta, lam
+    return math.asin(math.sin(eps) * math.sin(lam))
 
 
 # ============================================
@@ -205,7 +191,7 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     ap_view = view_rot @ ap_rot
 
     # 자전축: Rz(v) · Rz(ω) · Rx(-ε) · base_axis → tilt 적용 후 투영
-    v_now = true_anomaly(E_now, e)
+    v_now = true_anomaly_from_eccentric(E_now, e)
     base_axis = np.array([0.0, 0.0, 1.0])
     axis_3d = R_z(v_now) @ R_z(omega_rad) @ R_x(-eps_rad) @ base_axis
     axis_view = view_rot @ axis_3d
@@ -312,6 +298,7 @@ INIT_EPS = 23.44
 INIT_PHI = 37.0
 INIT_N = day_of_year(INIT_MONTH, INIT_DAY)
 INIT_SPEED = 30
+EQUINOX_N = day_of_year(3, 20)
 
 if "animate" not in st.session_state:
     st.session_state.animate = False
@@ -449,10 +436,11 @@ active_N = (
     else st.session_state.N
 )
 
-M = mean_anomaly(active_N)
-E_val = eccentric_anomaly(M, e)
-v = true_anomaly(E_val, e)
-delta, lam = solar_declination(v, omega_deg, epsilon_deg)
+omega_rad = math.radians(omega_deg)
+lam = (2 * math.pi * ((active_N - EQUINOX_N) % YEAR_DAYS)) / YEAR_DAYS
+v = (lam - omega_rad) % (2 * math.pi)
+E_val = eccentric_from_true(v, e)
+delta = solar_declination(lam, epsilon_deg)
 
 phi_list = np.linspace(-90, 90, 181)
 phi_rad_all = np.radians(phi_list)
