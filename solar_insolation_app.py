@@ -146,41 +146,20 @@ def sun_path_curve(phi_rad: float, delta: float) -> Tuple[np.ndarray, np.ndarray
 # 3. Orbit visualization
 # ============================================
 def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
+    """공전 위상·세차·자전축을 물리 순서대로 적용한 궤도 시각화."""
 
     # 시각적으로 보기 좋게 이심률 강조
     e_vis = min(e * 10, 0.9)
 
+    # 기본 파라미터
     a = 1.0
     b = a * math.sqrt(1 - e_vis * e_vis)
-    eps_rad = math.radians(epsilon_deg)
     omega_rad = math.radians(omega_deg)
-    view_tilt = math.radians(15)  # 공전면을 약간 위에서 내려다보기
-
-    E_all = np.linspace(0, 2 * np.pi, 500)
-    x = -a * (np.cos(E_all) - e_vis)
-    y = -b * np.sin(E_all) * math.cos(view_tilt)
-
-    xR, yR = x, y
-
-    xE = -a * (math.cos(E_now) - e_vis)
-    yE = -b * math.sin(E_now) * math.cos(view_tilt)
-    xE_R, yE_R = xE, yE
-
-    peri_x, peri_y = -a * (1 - e_vis), 0
-    ap_x, ap_y = a * (1 + e_vis), 0
-    peri_xR, peri_yR = peri_x, peri_y
-    ap_xR, ap_yR = ap_x, ap_y
-
-    fig, ax = plt.subplots(figsize=(2.4, 2.4), facecolor="#0a0f1c")
-    ax.set_facecolor("#0a0f1c")
-
-    ax.plot(xR, yR, linestyle="--", color="#4db7ff", linewidth=1.6)
-    ax.scatter(0, 0, s=140, color="#0d5c84", edgecolors="white", linewidths=1.5)
-    ax.text(0, 0, "☀", color="#ffef9f", fontsize=18, ha="center", va="center", weight="bold")
-    ax.scatter(xE_R, yE_R, s=70, color="#78ffba", edgecolors="#0a0f1c", linewidths=1.2)
+    eps_rad = math.radians(epsilon_deg)
+    view_tilt = math.radians(15)
 
     # 회전 행렬
-    def R_z(theta):
+    def R_z(theta: float) -> np.ndarray:
         return np.array(
             [
                 [math.cos(theta), -math.sin(theta), 0],
@@ -189,7 +168,7 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
             ]
         )
 
-    def R_x(theta):
+    def R_x(theta: float) -> np.ndarray:
         return np.array(
             [
                 [1, 0, 0],
@@ -198,29 +177,55 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
             ]
         )
 
-    # 자전축을 3D로 계산해 공전 위상과 세차를 모두 반영
-    base_axis = np.array([0.0, 0.0, 1.0])
-    axis_3d = R_z(E_now) @ R_z(omega_rad) @ R_x(-eps_rad) @ base_axis
+    view_rot = R_x(-view_tilt)
 
-    axis_proj = np.array(
-        [
-            axis_3d[0],
-            axis_3d[1] * math.cos(view_tilt) - axis_3d[2] * math.sin(view_tilt),
-        ]
-    )
-    axis_proj = axis_proj / np.linalg.norm(axis_proj)
+    # 공전 궤도 좌표 (perihelion이 왼쪽)
+    E_all = np.linspace(0, 2 * np.pi, 500)
+    x_base = -a * (np.cos(E_all) - e_vis)
+    y_base = b * np.sin(E_all)
+    orbit_base = np.vstack([x_base, y_base, np.zeros_like(x_base)])
+    orbit_rot = R_z(omega_rad) @ orbit_base
+    orbit_view = view_rot @ orbit_rot
+    xR, yR = orbit_view[0], orbit_view[1]
+
+    # 현재 지구 위치
+    xE_base = -a * (math.cos(E_now) - e_vis)
+    yE_base = b * math.sin(E_now)
+    pos_base = np.array([xE_base, yE_base, 0.0])
+    pos_rot = R_z(omega_rad) @ pos_base
+    pos_view = view_rot @ pos_rot
+    xE_R, yE_R = pos_view[0], pos_view[1]
+
+    # 근일점 / 원일점 (세차에 따라 회전)
+    peri_base = np.array([-a * (1 - e_vis), 0.0, 0.0])
+    ap_base = np.array([a * (1 + e_vis), 0.0, 0.0])
+    peri_rot = R_z(omega_rad) @ peri_base
+    ap_rot = R_z(omega_rad) @ ap_base
+    peri_view = view_rot @ peri_rot
+    ap_view = view_rot @ ap_rot
+
+    # 자전축: Rz(v) · Rz(ω) · Rx(-ε) · base_axis → tilt 적용 후 투영
+    v_now = true_anomaly(E_now, e)
+    base_axis = np.array([0.0, 0.0, 1.0])
+    axis_3d = R_z(v_now) @ R_z(omega_rad) @ R_x(-eps_rad) @ base_axis
+    axis_view = view_rot @ axis_3d
+    axis_proj = axis_view[:2] / np.linalg.norm(axis_view[:2])
 
     L = 0.35
-    ax.plot(
-        [xE_R - axis_proj[0] * L, xE_R + axis_proj[0] * L],
-        [yE_R - axis_proj[1] * L, yE_R + axis_proj[1] * L],
-        color="white",
-        linewidth=2,
-    )
+    xA1, yA1 = xE_R - axis_proj[0] * L, yE_R - axis_proj[1] * L
+    xA2, yA2 = xE_R + axis_proj[0] * L, yE_R + axis_proj[1] * L
 
-    # 근일점/원일점 마커만 표시
-    ax.scatter(peri_xR, peri_yR, s=70, color="#78ffba", alpha=0.9)
-    ax.scatter(ap_xR, ap_yR, s=70, color="#78ffba", alpha=0.9)
+    # 그림
+    fig, ax = plt.subplots(figsize=(2.4, 2.4), facecolor="#0a0f1c")
+    ax.set_facecolor("#0a0f1c")
+
+    ax.plot(xR, yR, linestyle="--", color="#4db7ff", linewidth=1.6)
+    ax.scatter(0, 0, s=140, color="#0d5c84", edgecolors="white", linewidths=1.5)
+    ax.text(0, 0, "☀", color="#ffef9f", fontsize=18, ha="center", va="center", weight="bold")
+    ax.scatter(xE_R, yE_R, s=70, color="#78ffba", edgecolors="#0a0f1c", linewidths=1.2)
+    ax.plot([xA1, xA2], [yA1, yA2], color="white", linewidth=2)
+    ax.scatter(peri_view[0], peri_view[1], s=70, color="#78ffba", alpha=0.9)
+    ax.scatter(ap_view[0], ap_view[1], s=70, color="#78ffba", alpha=0.9)
 
     ax.set_aspect("equal")
     R = 1 + e_vis + 0.55
