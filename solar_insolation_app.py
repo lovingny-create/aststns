@@ -162,6 +162,7 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     omega_rad = math.radians(omega_deg)
     eps_rad = math.radians(epsilon_deg)
     view_tilt = math.radians(15)
+    visual_offset = math.radians(-15)  # 화면 기준 회전(시계 방향)
 
     # 회전 행렬
     def R_z(theta: float) -> np.ndarray:
@@ -189,7 +190,7 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     x_base = -a * (np.cos(E_all) - e_vis)
     y_base = b * np.sin(E_all)
     orbit_base = np.vstack([x_base, y_base, np.zeros_like(x_base)])
-    orbit_rot = R_z(omega_rad) @ orbit_base
+    orbit_rot = R_z(omega_rad + visual_offset) @ orbit_base
     orbit_view = view_rot @ orbit_rot
     xR, yR = orbit_view[0], orbit_view[1]
 
@@ -197,21 +198,21 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     xE_base = -a * (math.cos(E_now) - e_vis)
     yE_base = b * math.sin(E_now)
     pos_base = np.array([xE_base, yE_base, 0.0])
-    pos_rot = R_z(omega_rad) @ pos_base
+    pos_rot = R_z(omega_rad + visual_offset) @ pos_base
     pos_view = view_rot @ pos_rot
     xE_R, yE_R = pos_view[0], pos_view[1]
 
     # 근일점 / 원일점 (세차에 따라 회전)
     peri_base = np.array([-a * (1 - e_vis), 0.0, 0.0])
     ap_base = np.array([a * (1 + e_vis), 0.0, 0.0])
-    peri_rot = R_z(omega_rad) @ peri_base
-    ap_rot = R_z(omega_rad) @ ap_base
+    peri_rot = R_z(omega_rad + visual_offset) @ peri_base
+    ap_rot = R_z(omega_rad + visual_offset) @ ap_base
     peri_view = view_rot @ peri_rot
     ap_view = view_rot @ ap_rot
 
     # 자전축: 우주 공간에서 방향 고정 (세차·경사만 적용)
     base_axis = np.array([0.0, 0.0, 1.0])
-    axis_3d = R_z(omega_rad) @ R_x(-eps_rad) @ base_axis
+    axis_3d = R_z(omega_rad + visual_offset) @ R_x(-eps_rad) @ base_axis
     axis_view = view_rot @ axis_3d
     axis_proj = axis_view[:2] / np.linalg.norm(axis_view[:2])
 
