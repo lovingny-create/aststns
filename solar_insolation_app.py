@@ -454,10 +454,13 @@ active_N = (
     else st.session_state.N
 )
 
+omega_deg = st.session_state.omega_deg
 omega_rad = math.radians(omega_deg)
-# 날짜(춘분 기준) → 황경 → 진근점이각
+
+# 날짜(춘분 기준) → 황경 → 진근점이각 → 편심근점이각
 lam = (2 * math.pi * (active_N - EQUINOX_N) / YEAR_DAYS) % (2 * math.pi)
 v = (lam - omega_rad) % (2 * math.pi)
+E_val = eccentric_from_true(v, e)
 delta = solar_declination(lam, epsilon_deg)
 
 phi_list = np.linspace(-90, 90, 181)
