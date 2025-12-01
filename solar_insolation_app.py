@@ -190,10 +190,9 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     peri_view = view_rot @ peri_rot
     ap_view = view_rot @ ap_rot
 
-    # 자전축: Rz(v) · Rz(ω) · Rx(-ε) · base_axis → tilt 적용 후 투영
-    v_now = true_anomaly_from_eccentric(E_now, e)
+    # 자전축: 우주 공간에서 방향 고정 (세차·경사만 적용)
     base_axis = np.array([0.0, 0.0, 1.0])
-    axis_3d = R_z(v_now) @ R_z(omega_rad) @ R_x(-eps_rad) @ base_axis
+    axis_3d = R_z(omega_rad) @ R_x(-eps_rad) @ base_axis
     axis_view = view_rot @ axis_3d
     axis_proj = axis_view[:2] / np.linalg.norm(axis_view[:2])
 
