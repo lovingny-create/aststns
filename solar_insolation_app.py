@@ -308,7 +308,6 @@ INIT_EPS = 23.44
 INIT_PHI = 37.0
 INIT_N = day_of_year(INIT_MONTH, INIT_DAY)
 INIT_SPEED = 30
-EQUINOX_N = day_of_year(3, 20)
 
 if "animate" not in st.session_state:
     st.session_state.animate = False
@@ -448,9 +447,8 @@ active_N = (
 
 omega_rad = math.radians(omega_deg)
 
-# 날짜 → 평균황경(L) → 평균근점이각(M=L-ω) → 편심근점이각 → 진근점이각 → 황경
-mean_longitude = 2 * math.pi * (active_N / YEAR_DAYS)
-M = (mean_longitude - omega_rad) % (2 * math.pi)
+# 날짜 → 평균근점이각 → 편심근점이각 → 진근점이각 → 황경
+M = 2 * math.pi * (active_N / YEAR_DAYS)
 E_val = eccentric_anomaly(M, e)
 v = true_anomaly_from_eccentric(E_val, e)
 lam = (v + omega_rad) % (2 * math.pi)
