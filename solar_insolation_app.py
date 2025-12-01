@@ -310,8 +310,9 @@ st.markdown(
 INIT_MONTH = 3
 INIT_DAY = 21
 INIT_E = 0.0167
-INIT_PRECESSION_YEAR = int(round(26000 * 102.0 / 360.0))  # ≈ 현재 지구 세차 위치(ω≈102°)
-INIT_OMEGA = (INIT_PRECESSION_YEAR / 26000) * 360
+CURRENT_OMEGA = 102.0
+INIT_PRECESSION_YEAR = 0
+INIT_OMEGA = CURRENT_OMEGA
 INIT_EPS = 23.44
 INIT_PHI = 37.0
 INIT_N = day_of_year(INIT_MONTH, INIT_DAY)
@@ -428,7 +429,7 @@ with st.sidebar:
     st.subheader("밀란코비치 변수")
     e = st.slider("이심률 e", 0.0, 0.1, 0.0167, 0.0001, key="e")
     precession_year = st.slider(
-        "세차 단계 (년)",
+        "세차 변화량 (현재 시대 기준)",
         0,
         26000,
         st.session_state.precession_year,
@@ -438,7 +439,7 @@ with st.sidebar:
             "계절의 위치(근일점/원일점과의 상대 위치)가 서서히 변합니다."
         ),
     )
-    omega_deg = (precession_year / 26000) * 360
+    omega_deg = CURRENT_OMEGA + (precession_year / 26000) * 360
     st.session_state.omega_deg = omega_deg
     epsilon_deg = st.slider("축 경사(ε)", 0.0, 40.0, 23.44, key="epsilon_deg")
 
