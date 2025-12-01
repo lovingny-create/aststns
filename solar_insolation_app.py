@@ -436,7 +436,9 @@ active_N = (
 )
 
 omega_rad = math.radians(omega_deg)
-lam = (2 * math.pi * ((active_N - EQUINOX_N) % YEAR_DAYS)) / YEAR_DAYS
+mean_longitude = (2 * math.pi * (active_N / YEAR_DAYS))
+lambda_equinox = (2 * math.pi * (EQUINOX_N / YEAR_DAYS))
+lam = (mean_longitude - lambda_equinox) % (2 * math.pi)
 v = (lam - omega_rad) % (2 * math.pi)
 E_val = eccentric_from_true(v, e)
 delta = solar_declination(lam, epsilon_deg)
