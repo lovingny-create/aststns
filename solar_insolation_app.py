@@ -448,8 +448,9 @@ active_N = (
 
 omega_rad = math.radians(omega_deg)
 
-# 날짜 → 평균근점이각 → 편심근점이각 → 진근점이각 → 황경
-M = 2 * math.pi * (active_N / YEAR_DAYS)
+# 날짜 → 평균황경(L) → 평균근점이각(M=L-ω) → 편심근점이각 → 진근점이각 → 황경
+mean_longitude = 2 * math.pi * (active_N / YEAR_DAYS)
+M = (mean_longitude - omega_rad) % (2 * math.pi)
 E_val = eccentric_anomaly(M, e)
 v = true_anomaly_from_eccentric(E_val, e)
 lam = (v + omega_rad) % (2 * math.pi)
