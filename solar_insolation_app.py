@@ -150,7 +150,7 @@ def sun_path_curve(phi_rad: float, delta: float) -> Tuple[np.ndarray, np.ndarray
 # ============================================
 # 3. Orbit visualization
 # ============================================
-def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
+def draw_orbit(e: float, omega_deg: float, lam: float, epsilon_deg: float):
     """공전 위상·세차·자전축을 물리 순서대로 적용한 궤도 시각화."""
 
     # 시각적으로 보기 좋게 이심률 강조
@@ -160,6 +160,7 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     a = 1.0
     b = a * math.sqrt(1 - e_vis * e_vis)
     omega_rad = math.radians(omega_deg)
+    v_rel = (lam - omega_rad) % (2 * math.pi)
     eps_rad = math.radians(epsilon_deg)
     view_tilt = math.radians(15)
     visual_offset = math.radians(-15)  # 화면 기준 회전(시계 방향)
@@ -186,17 +187,19 @@ def draw_orbit(e: float, omega_deg: float, E_now: float, epsilon_deg: float):
     view_rot = R_x(-view_tilt)
 
     # 공전 궤도 좌표 (perihelion이 왼쪽)
-    E_all = np.linspace(0, 2 * np.pi, 500)
-    x_base = -a * (np.cos(E_all) - e_vis)
-    y_base = b * np.sin(E_all)
+    v_all = np.linspace(0, 2 * np.pi, 500)
+    r_all = a * (1 - e_vis * e_vis) / (1 + e_vis * np.cos(v_all))
+    x_base = -r_all * np.cos(v_all)
+    y_base = r_all * np.sin(v_all)
     orbit_base = np.vstack([x_base, y_base, np.zeros_like(x_base)])
     orbit_rot = R_z(omega_rad + visual_offset) @ orbit_base
     orbit_view = view_rot @ orbit_rot
     xR, yR = orbit_view[0], orbit_view[1]
 
     # 현재 지구 위치
-    xE_base = -a * (math.cos(E_now) - e_vis)
-    yE_base = b * math.sin(E_now)
+    r_now = a * (1 - e_vis * e_vis) / (1 + e_vis * math.cos(v_rel))
+    xE_base = -r_now * math.cos(v_rel)
+    yE_base = r_now * math.sin(v_rel)
     pos_base = np.array([xE_base, yE_base, 0.0])
     pos_rot = R_z(omega_rad + visual_offset) @ pos_base
     pos_view = view_rot @ pos_rot
@@ -458,10 +461,9 @@ active_N = (
 )
 
 omega_rad = math.radians(omega_deg)
-# 날짜(춘분 기준) → 황경 → 진근점이각 → 편심근점이각
+# 날짜(춘분 기준) → 황경 → 진근점이각
 lam = (2 * math.pi * (active_N - EQUINOX_N) / YEAR_DAYS) % (2 * math.pi)
 v = (lam - omega_rad) % (2 * math.pi)
-E_val = eccentric_from_true(v, e)
 delta = solar_declination(lam, epsilon_deg)
 
 phi_list = np.linspace(-90, 90, 181)
@@ -539,7 +541,7 @@ top_col_orbit, top_col_chart, top_col_sky = st.columns([1, 1, 1])
 
 with top_col_orbit:
     st.subheader("🛰️ 지구 공전 궤도")
-    fig_orbit = draw_orbit(e, omega_deg, E_val, epsilon_deg)
+    fig_orbit = draw_orbit(e, omega_deg, lam, epsilon_deg)
     st.pyplot(fig_orbit)
 
     ctrl_cols = st.columns([1, 1, 1])
