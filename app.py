@@ -85,6 +85,10 @@ def main() -> None:
         hover_label = "위상"
 
     fig = go.Figure()
+    flux_hover = (
+        "{label}: %{{x:.3f}}<br>정규화 광도: %{{y:.4f}}<extra></extra>"
+    ).format(label=hover_label)
+
     fig.add_trace(
         go.Scatter(
             x=x_values,
@@ -92,9 +96,7 @@ def main() -> None:
             mode="lines",
             line=dict(color="royalblue", width=2),
             name="광도",
-            hovertemplate=(
-                f"{hover_label}: %{{x:.3f}}<br>정규화 광도: %{{y:.4f}}<extra></extra>"
-            ),
+            hovertemplate=flux_hover,
         )
     )
     fig.update_layout(
@@ -106,6 +108,13 @@ def main() -> None:
     )
 
     rv_fig = go.Figure()
+    rv_primary_hover = (
+        "{label}: %{{x:.3f}}<br>v<sub>r1</sub>: %{{y:.2f}} m/s<extra></extra>"
+    ).format(label=hover_label)
+    rv_secondary_hover = (
+        "{label}: %{{x:.3f}}<br>v<sub>r2</sub>: %{{y:.2f}} m/s<extra></extra>"
+    ).format(label=hover_label)
+
     rv_fig.add_trace(
         go.Scatter(
             x=x_values,
@@ -113,9 +122,7 @@ def main() -> None:
             mode="lines",
             line=dict(color="indianred", width=2),
             name="주성 RV",
-            hovertemplate=(
-                f"{hover_label}: %{{x:.3f}}<br>v<sub>r1</sub>: %{{y:.2f}} m/s<extra></extra>"
-            ),
+            hovertemplate=rv_primary_hover,
         )
     )
     rv_fig.add_trace(
@@ -125,9 +132,7 @@ def main() -> None:
             mode="lines",
             line=dict(color="seagreen", width=2),
             name="반성 RV",
-            hovertemplate=(
-                f"{hover_label}: %{{x:.3f}}<br>v<sub>r2</sub>: %{{y:.2f}} m/s<extra></extra>"
-            ),
+            hovertemplate=rv_secondary_hover,
         )
     )
     rv_fig.update_layout(
