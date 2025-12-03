@@ -53,6 +53,12 @@ main {
   padding: 20px;
 }
 
+.plot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
 .controls h2,
 .plot h2 {
   margin: 0 0 12px;
@@ -74,15 +80,25 @@ main {
   accent-color: var(--accent);
 }
 
+.control-group select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
 .note {
   margin-top: 12px;
   font-size: 13px;
   color: var(--muted);
 }
 
-#curve {
+#curve,
+#rv-curve {
   width: 100%;
-  min-height: 480px;
+  min-height: 320px;
 }
 
 footer {

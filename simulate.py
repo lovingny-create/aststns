@@ -20,12 +20,12 @@ else:  # pragma: no cover - optional dependency
 from binary_lightcurve import BinarySystem, Star, period_from_parameters
 
 
-def write_svg_light_curve(path: Path, phases: list[float], fluxes: list[float]) -> None:
+def write_svg_light_curve(path: Path, x_values: list[float], fluxes: list[float], x_label: str) -> None:
     """Write a minimal SVG polyline plot for the light curve when matplotlib is missing."""
 
     width, height = 800, 450
     margin = 50
-    x_min, x_max = min(phases), max(phases)
+    x_min, x_max = min(x_values), max(x_values)
     y_min, y_max = min(fluxes), max(fluxes)
     x_range = x_max - x_min or 1.0
     y_range = y_max - y_min or 1.0
@@ -37,7 +37,7 @@ def write_svg_light_curve(path: Path, phases: list[float], fluxes: list[float]) 
         # Flip y because SVG origin is at the top-left corner
         return height - margin - (y - y_min) / y_range * (height - 2 * margin)
 
-    polyline_points = " ".join(f"{sx(x):.2f},{sy(y):.2f}" for x, y in zip(phases, fluxes))
+    polyline_points = " ".join(f"{sx(x):.2f},{sy(y):.2f}" for x, y in zip(x_values, fluxes))
     axes = (
         f'<line x1="{margin}" y1="{margin}" x2="{margin}" y2="{height-margin}" stroke="black" stroke-width="1" />'
         f'<line x1="{margin}" y1="{height-margin}" x2="{width-margin}" y2="{height-margin}" stroke="black" stroke-width="1" />'
@@ -49,7 +49,7 @@ def write_svg_light_curve(path: Path, phases: list[float], fluxes: list[float]) 
   <rect width="100%" height="100%" fill="white" />
   {axes}
   <polyline fill="none" stroke="steelblue" stroke-width="2" points="{polyline_points}" />
-  <text x="{width / 2}" y="{height - margin}" font-size="14" text-anchor="middle" dy="28">Orbital phase</text>
+  <text x="{width / 2}" y="{height - margin}" font-size="14" text-anchor="middle" dy="28">{x_label}</text>
   <text x="{margin}" y="{margin}" font-size="14" text-anchor="start" dy="-10">Relative flux</text>
 </svg>
 """
@@ -75,6 +75,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional path for saving the light-curve plot (PNG). Defaults to output stem with .png",
     )
+    parser.add_argument(
+        "--x-axis",
+        choices=["phase", "day", "minute"],
+        default="phase",
+        help="Use orbital phase or convert to time in days/minutes for plots and CSV",
+    )
     return parser.parse_args()
 
 
@@ -90,8 +96,8 @@ def compute_light_curve(
     eccentricity: float,
     inclination: float,
     phases: int,
-) -> tuple[list[float], list[float], float]:
-    """Create a binary system and return phases, fluxes, and the orbital period."""
+) -> tuple[list[float], list[float], list[float], list[float], float]:
+    """Create a binary system and return phases, fluxes, RVs, and the orbital period."""
 
     primary = Star(mass1, radius1, temp1)
     secondary = Star(mass2, radius2, temp2)
@@ -106,14 +112,14 @@ def compute_light_curve(
         period=period,
     )
 
-    phases_values, fluxes = system.light_curve(phases)
-    return phases_values, fluxes, period
+    phases_values, fluxes, rv_primary, rv_secondary = system.light_curve(phases)
+    return phases_values, fluxes, rv_primary, rv_secondary, period
 
 
 def main() -> None:
     args = parse_args()
 
-    phases, fluxes, period = compute_light_curve(
+    phases, fluxes, rv1, rv2, period = compute_light_curve(
         mass1=args.mass1,
         mass2=args.mass2,
         radius1=args.radius1,
@@ -125,28 +131,63 @@ def main() -> None:
         inclination=args.inclination,
         phases=args.phases,
     )
+    time_seconds = [phase * period for phase in phases]
+    if args.x_axis == "day":
+        x_values = [t / 86400 for t in time_seconds]
+        x_label = "Time (days)"
+        time_header = "time_days"
+    elif args.x_axis == "minute":
+        x_values = [t / 60 for t in time_seconds]
+        x_label = "Time (minutes)"
+        time_header = "time_minutes"
+    else:
+        x_values = phases
+        x_label = "Orbital phase"
+        time_header = None
+
     with args.output.open("w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["phase", "relative_flux"])
-        writer.writerows(zip(phases, fluxes))
+        header = ["phase"]
+        if time_header:
+            header.append(time_header)
+        header += ["relative_flux", "rv_primary", "rv_secondary"]
+        writer.writerow(header)
+
+        rows = []
+        for idx in range(len(phases)):
+            row = [phases[idx]]
+            if time_header:
+                row.append(x_values[idx])
+            row += [fluxes[idx], rv1[idx], rv2[idx]]
+            rows.append(row)
+        writer.writerows(rows)
 
     print(f"Saved {len(phases)} samples to {args.output.resolve()}")
     print(f"Orbital period: {period / 86400:.2f} days")
 
     fig_path = args.figure if args.figure is not None else args.output.with_suffix(".png")
     if plt is not None:
-        fig, ax = plt.subplots(figsize=(8, 4.5))
-        ax.plot(phases, fluxes, color="tab:blue", linewidth=1.5)
-        ax.set_xlabel("Orbital phase")
-        ax.set_ylabel("Relative flux")
-        ax.set_title("Eclipsing binary light curve")
-        ax.grid(True, alpha=0.3)
+        fig, (ax_flux, ax_rv) = plt.subplots(2, 1, figsize=(8, 7), sharex=True)
+
+        ax_flux.plot(x_values, fluxes, color="tab:blue", linewidth=1.5)
+        ax_flux.set_ylabel("Relative flux")
+        ax_flux.set_title("Eclipsing binary light curve")
+        ax_flux.grid(True, alpha=0.3)
+
+        ax_rv.plot(x_values, rv1, color="tab:red", linewidth=1.2, label="Primary RV")
+        ax_rv.plot(x_values, rv2, color="tab:green", linewidth=1.2, label="Secondary RV")
+        ax_rv.set_xlabel(x_label)
+        ax_rv.set_ylabel("Line-of-sight velocity (m/s)")
+        ax_rv.set_title("Radial velocity curves")
+        ax_rv.legend()
+        ax_rv.grid(True, alpha=0.3)
+
         fig.tight_layout()
         fig.savefig(fig_path)
         print(f"Saved plot to {fig_path.resolve()}")
     else:
         svg_path = fig_path if fig_path.suffix.lower() == ".svg" else fig_path.with_suffix(".svg")
-        write_svg_light_curve(svg_path, phases, fluxes)
+        write_svg_light_curve(svg_path, x_values, fluxes, x_label)
         print(
             "matplotlib is not installed; saved a fallback SVG plot to " f"{svg_path.resolve()}"
         )

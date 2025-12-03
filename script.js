@@ -13,6 +13,7 @@ const elements = {
   ecc: document.getElementById('ecc'),
   inc: document.getElementById('inc'),
   period: document.getElementById('period'),
+  xMode: document.getElementById('x-mode'),
 };
 
 const labels = {
@@ -63,6 +64,31 @@ function projectedSeparation(a, e, nu, inclination) {
   return { separation: Math.hypot(x, y), lineOfSight: z };
 }
 
+function projectedVelocities(a, e, nu, inclination, m1, m2) {
+  const mu = G * (m1 + m2);
+  const r = (a * (1 - e * e)) / (1 + e * Math.cos(nu));
+  const h = Math.sqrt(mu * a * (1 - e * e));
+
+  const rDot = (mu / h) * e * Math.sin(nu);
+  const thetaDot = h / (r * r);
+
+  const vxRel = rDot * Math.cos(nu) - r * thetaDot * Math.sin(nu);
+  const vyRel = rDot * Math.sin(nu) + r * thetaDot * Math.cos(nu);
+
+  const vx2 = (m1 / (m1 + m2)) * vxRel;
+  const vy2 = (m1 / (m1 + m2)) * vyRel;
+  const vx1 = -(m2 / (m1 + m2)) * vxRel;
+  const vy1 = -(m2 / (m1 + m2)) * vyRel;
+
+  const cosI = Math.cos(inclination);
+  const sinI = Math.sin(inclination);
+
+  const vz1 = vy1 * sinI;
+  const vz2 = vy2 * sinI;
+
+  return { vz1, vz2 };
+}
+
 function overlapArea(r1, r2, d) {
   if (d >= r1 + r2) return 0;
   if (d <= Math.abs(r1 - r2)) return Math.PI * Math.min(r1, r2) ** 2;
@@ -91,6 +117,8 @@ function computeCurve(params) {
 
   const phases = [];
   const normalizedFlux = [];
+  const rv1 = [];
+  const rv2 = [];
 
   const samples = 400;
   for (let idx = 0; idx <= samples; idx += 1) {
@@ -99,6 +127,7 @@ function computeCurve(params) {
     const E = keplerEccentricAnomaly(M, eccentricity);
     const nu = trueAnomaly(E, eccentricity);
     const { separation, lineOfSight } = projectedSeparation(a, eccentricity, nu, inclination);
+    const { vz1, vz2 } = projectedVelocities(a, eccentricity, nu, inclination, mass1, mass2);
 
     const d = separation;
     let flux = baseline;
@@ -117,9 +146,11 @@ function computeCurve(params) {
 
     phases.push(phase);
     normalizedFlux.push(flux / baseline);
+    rv1.push(vz1);
+    rv2.push(vz2);
   }
 
-  return { phases, normalizedFlux };
+  return { phases, normalizedFlux, rv1, rv2 };
 }
 
 function redraw() {
@@ -136,31 +167,78 @@ function redraw() {
     periodDays: Number(elements.period.value),
   };
 
-  const { phases, normalizedFlux } = computeCurve(params);
+  const { phases, normalizedFlux, rv1, rv2 } = computeCurve(params);
+  const xMode = elements.xMode.value;
 
-  const trace = {
-    x: phases,
+  let xValues = phases;
+  let xLabel = 'Orbital Phase';
+  let hoverLabel = '위상';
+  if (xMode === 'day') {
+    xValues = phases.map((p) => p * params.periodDays);
+    xLabel = 'Time (days)';
+    hoverLabel = '시간(일)';
+  } else if (xMode === 'minute') {
+    xValues = phases.map((p) => p * params.periodDays * 24 * 60);
+    xLabel = 'Time (minutes)';
+    hoverLabel = '시간(분)';
+  }
+  const xMax = xValues[xValues.length - 1];
+
+  const fluxTrace = {
+    x: xValues,
     y: normalizedFlux,
     mode: 'lines',
     line: { color: '#38bdf8', width: 2 },
-    hovertemplate: '위상: %{x:.3f}<br>정규화 광도: %{y:.4f}<extra></extra>',
+    hovertemplate: `${hoverLabel}: %{x:.3f}<br>정규화 광도: %{y:.4f}<extra></extra>`,
   };
 
-  const layout = {
+  const fluxLayout = {
     margin: { t: 16, r: 12, b: 50, l: 60 },
-    xaxis: { title: 'Orbital Phase', range: [0, 1], zeroline: false },
+    xaxis: { title: xLabel, range: [0, xMax], zeroline: false },
     yaxis: { title: 'Normalized Flux', zeroline: false },
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
     font: { color: '#e5e7eb' },
   };
 
-  Plotly.react('curve', [trace], layout, { responsive: true });
+  const rvTraces = [
+    {
+      x: xValues,
+      y: rv1,
+      mode: 'lines',
+      line: { color: '#f97316', width: 2 },
+      name: '주성 RV',
+      hovertemplate: `${hoverLabel}: %{x:.3f}<br>v<sub>r1</sub>: %{y:.2f} m/s<extra></extra>`,
+    },
+    {
+      x: xValues,
+      y: rv2,
+      mode: 'lines',
+      line: { color: '#34d399', width: 2 },
+      name: '반성 RV',
+      hovertemplate: `${hoverLabel}: %{x:.3f}<br>v<sub>r2</sub>: %{y:.2f} m/s<extra></extra>`,
+    },
+  ];
+
+  const rvLayout = {
+    margin: { t: 16, r: 12, b: 50, l: 60 },
+    xaxis: { title: xLabel, range: [0, xMax], zeroline: false },
+    yaxis: { title: 'Line-of-sight velocity (m/s)', zeroline: false },
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: '#e5e7eb' },
+    legend: { orientation: 'h', y: -0.2 },
+  };
+
+  Plotly.react('curve', [fluxTrace], fluxLayout, { responsive: true });
+  Plotly.react('rv-curve', rvTraces, rvLayout, { responsive: true });
 }
 
 Object.values(elements).forEach((el) => {
   el.addEventListener('input', redraw);
 });
+
+elements.xMode.addEventListener('change', redraw);
 
 updateLabels();
 redraw();

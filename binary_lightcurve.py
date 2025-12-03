@@ -80,6 +80,37 @@ class BinarySystem:
         star2 = (x2, y2_proj, z2_proj)
         return star1, star2
 
+    def _projected_velocities(self, true_anomaly: float) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+        """Return velocity components for each star with line-of-sight projection.
+
+        The positive z-direction corresponds to the observer-facing axis used in
+        ``_projected_positions``, so the returned z-components can be interpreted as
+        approaching/receding speeds along the line of sight.
+        """
+
+        r = self._orbital_separation(true_anomaly)
+        mu = G * (self.primary.mass + self.secondary.mass)
+        # Specific angular momentum for the relative orbit
+        h = math.sqrt(mu * self.semi_major_axis * (1 - self.eccentricity ** 2))
+
+        r_dot = (mu / h) * self.eccentricity * math.sin(true_anomaly)
+        theta_dot = h / (r ** 2)
+
+        vx_rel = r_dot * math.cos(true_anomaly) - r * theta_dot * math.sin(true_anomaly)
+        vy_rel = r_dot * math.sin(true_anomaly) + r * theta_dot * math.cos(true_anomaly)
+
+        m1, m2 = self.primary.mass, self.secondary.mass
+        vx2, vy2 = (m1 / (m1 + m2)) * vx_rel, (m1 / (m1 + m2)) * vy_rel
+        vx1, vy1 = -(m2 / (m1 + m2)) * vx_rel, -(m2 / (m1 + m2)) * vy_rel
+
+        cos_i, sin_i = math.cos(self.inclination), math.sin(self.inclination)
+        vy1_proj, vz1_proj = vy1 * cos_i, vy1 * sin_i
+        vy2_proj, vz2_proj = vy2 * cos_i, vy2 * sin_i
+
+        star1_v = (vx1, vy1_proj, vz1_proj)
+        star2_v = (vx2, vy2_proj, vz2_proj)
+        return star1_v, star2_v
+
     def _circle_overlap(self, d: float, r1: float, r2: float) -> float:
         """Return area of overlap of two circles with separation d."""
         if d >= r1 + r2:
@@ -101,9 +132,11 @@ class BinarySystem:
         back_area = math.pi * back_radius ** 2 - overlap
         return front.surface_brightness * math.pi * front_radius ** 2 + back.surface_brightness * back_area
 
-    def light_curve(self, phase_count: int = 500) -> Tuple[List[float], List[float]]:
+    def light_curve(self, phase_count: int = 500) -> Tuple[List[float], List[float], List[float], List[float]]:
         phases = _linspace(0.0, 1.0, phase_count)
         fluxes: List[float] = []
+        rv_primary: List[float] = []
+        rv_secondary: List[float] = []
 
         total_area_flux = (
             self.primary.surface_brightness * math.pi * self.primary.radius ** 2
@@ -114,6 +147,7 @@ class BinarySystem:
             mean_anomaly = 2 * math.pi * phase
             true_anomaly = self._mean_to_true_anomaly(mean_anomaly)
             star1, star2 = self._projected_positions(true_anomaly)
+            star1_v, star2_v = self._projected_velocities(true_anomaly)
             separation = _euclidean_distance_2d(star1[:2], star2[:2])
 
             # Determine which star is in front (smaller z means closer to observer)
@@ -123,8 +157,10 @@ class BinarySystem:
                 flux = self._flux_with_occultation(separation, self.secondary, self.primary, self.secondary.radius, self.primary.radius)
 
             fluxes.append(flux / total_area_flux)
+            rv_primary.append(star1_v[2])
+            rv_secondary.append(star2_v[2])
 
-        return phases, fluxes
+        return phases, fluxes, rv_primary, rv_secondary
 
 
 def period_from_parameters(semi_major_axis: float, mass1: float, mass2: float) -> float:

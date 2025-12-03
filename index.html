@@ -51,11 +51,27 @@
         <label for="period">궤도주기 P (일): <span id="period-val"></span></label>
         <input type="range" id="period" min="0.4" max="10" step="0.05" value="3" />
       </div>
+      <div class="control-group">
+        <label for="x-mode">X축 단위:</label>
+        <select id="x-mode">
+          <option value="phase">위상</option>
+          <option value="day">시간 (일)</option>
+          <option value="minute">시간 (분)</option>
+        </select>
+      </div>
       <p class="note">* 단위: 태양 질량(M☉), 태양 반지름(R☉), 켈빈(K), 일(day)</p>
     </section>
     <section class="plot">
-      <h2>정규화 광도곡선</h2>
-      <div id="curve" aria-label="광도곡선 그래프"></div>
+      <div class="plot-grid">
+        <div>
+          <h2>정규화 광도곡선</h2>
+          <div id="curve" aria-label="광도곡선 그래프"></div>
+        </div>
+        <div>
+          <h2>시선속도 곡선</h2>
+          <div id="rv-curve" aria-label="시선속도 그래프"></div>
+        </div>
+      </div>
     </section>
   </main>
   <footer>
